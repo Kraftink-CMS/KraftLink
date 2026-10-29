@@ -1,0 +1,8 @@
+{
+    "id": "kraftlink",
+    "name": "KraftLink",
+    "version": "${project.version}",
+    "description": "Connect the proxy to KraftInk.",
+    "authors": ["nivcoo"],
+    "main": "fr.nivcoo.kraftlink.velocity.KraftLink"
+}

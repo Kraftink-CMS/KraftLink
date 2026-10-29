@@ -1,0 +1,45 @@
+name: Build KraftLink release assets
+description: Validate the checked source and collect the connector JARs.
+inputs:
+  version:
+    description: Checked source version
+    required: true
+  output-directory:
+    description: Absolute destination for release assets
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Locate the connector source
+      id: source
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        set -euo pipefail
+        root=$(cd -- "$ACTION_PATH/../../.." && pwd -P)
+        printf 'root=%s\n' "$root" >> "$GITHUB_OUTPUT"
+    - uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165
+      with:
+        distribution: temurin
+        java-version: '25'
+        cache: maven
+        cache-dependency-path: ${{ steps.source.outputs.root }}/**/pom.xml
+    - name: Build and collect the release assets
+      shell: bash
+      working-directory: ${{ steps.source.outputs.root }}
+      env:
+        VERSION: ${{ inputs.version }}
+        OUTPUT_DIRECTORY: ${{ inputs.output-directory }}
+      run: |
+        set -euo pipefail
+        [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-dev)?$ ]]
+        [[ "$OUTPUT_DIRECTORY" == /* ]]
+        mvn -B -ntp clean package "-Dproject.build.outputTimestamp=$(git show -s --format=%cI HEAD)"
+        mkdir -- "$OUTPUT_DIRECTORY"
+        for jar in KraftLink.jar "KraftLink-Bukkit-$VERSION.jar" "KraftLink-Velocity-$VERSION.jar" "KraftLink-Hytale-$VERSION.jar"; do
+          [[ -f "target/$jar" && ! -L "target/$jar" ]]
+          cp -- "target/$jar" "$OUTPUT_DIRECTORY/"
+        done
+        cd "$OUTPUT_DIRECTORY"
+        sha256sum -- *.jar > SHA256SUMS

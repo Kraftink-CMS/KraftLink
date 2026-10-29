@@ -1,0 +1,14 @@
+name: KraftLink
+version: '${project.version}'
+main: fr.nivcoo.kraftlink.bukkit.KraftLink
+folia-supported: true
+
+description: KraftInk server connection
+author: Nivcoo
+commands:
+  kraftlink:
+    description: Manage the KraftInk server connection
+    permission: kraftlink.admin
+permissions:
+  kraftlink.admin:
+    default: op
