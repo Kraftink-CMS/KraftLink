@@ -1,0 +1,13 @@
+{
+    "Group": "fr.nivcoo.kraftink",
+    "Name": "KraftLink",
+    "Version": "${project.version}",
+    "Description": "KraftInk server connection",
+    "Main": "fr.nivcoo.kraftlink.hytale.KraftLink",
+    "Authors": [{ "Name": "Nivcoo" }],
+    "ServerVersion": "${hytale.server.range}",
+    "Dependencies": {},
+    "OptionalDependencies": {},
+    "DisabledByDefault": false,
+    "IncludesAssetPack": false
+}
