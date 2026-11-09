@@ -7,7 +7,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>fr.nivcoo.kraftink</groupId>
     <artifactId>KraftLink-parent</artifactId>
-    <version>1.4.0</version>
+    <version>1.5.0</version>
     <packaging>pom</packaging>
     <modules>
         <module>api</module>
@@ -57,6 +57,10 @@
                             <relocation>
                                 <pattern>com.google.gson</pattern>
                                 <shadedPattern>fr.nivcoo.kraftlink.lib.gson</shadedPattern>
+                            </relocation>
+                            <relocation>
+                                <pattern>com.google.errorprone.annotations</pattern>
+                                <shadedPattern>fr.nivcoo.kraftlink.lib.errorprone</shadedPattern>
                             </relocation>
                         </relocations>
                         <filters>

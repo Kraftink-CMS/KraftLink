@@ -24,6 +24,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
+import java.util.stream.Collectors;
 
 public final class MinecraftPlatform implements ServerPlatform {
 
@@ -59,14 +60,15 @@ public final class MinecraftPlatform implements ServerPlatform {
             List<Heartbeat.PlayerIdentity> players = playerList.getPlayers().stream()
                     .map(player -> new Heartbeat.PlayerIdentity(player.getUUID().toString(),
                             player.getGameProfile().name()))
-                    .toList();
+                    .collect(Collectors.toList());
             List<Heartbeat.WorldStatus> worlds = new ArrayList<>();
             for (ServerLevel world : server.getAllLevels()) {
                 worlds.add(new Heartbeat.WorldStatus(world.dimension().identifier().toString(), world.players().size()));
             }
             long averageTickNanos = server.getAverageTickTimeNanos();
             List<Double> tps = averageTickNanos > 0
-                    ? List.of(Math.min(server.tickRateManager().tickrate(), 1_000_000_000.0 / averageTickNanos))
+                    ? Collections.singletonList(Math.min(server.tickRateManager().tickrate(),
+                            1_000_000_000.0 / averageTickNanos))
                     : Collections.emptyList();
             return new Heartbeat(1, "minecraft", software, server.getServerVersion(), players,
                     playerList.getMaxPlayers(), ManagementFactory.getRuntimeMXBean().getUptime() / 1000, tps,

@@ -14,18 +14,19 @@ public final class Heartbeat {
     private final Integer playersOnline;
     private final int maxPlayers;
     private final long uptimeSeconds;
+    private final Double cpuPercent;
     private final List<Double> tps;
     private final Memory memory;
     private final List<WorldStatus> worlds;
 
     public Heartbeat(int protocol, String game, String software, String version, List<PlayerIdentity> players,
                      int maxPlayers, long uptimeSeconds, List<Double> tps, Memory memory, List<WorldStatus> worlds) {
-        this(protocol, game, software, version, players, maxPlayers, uptimeSeconds, tps, memory, worlds, null);
+        this(protocol, game, software, version, players, maxPlayers, uptimeSeconds, tps, memory, worlds, null, null);
     }
 
     private Heartbeat(int protocol, String game, String software, String version, List<PlayerIdentity> players,
                       int maxPlayers, long uptimeSeconds, List<Double> tps, Memory memory, List<WorldStatus> worlds,
-                      Integer playersOnline) {
+                      Integer playersOnline, Double cpuPercent) {
         this.protocol = protocol;
         this.game = game;
         this.software = software;
@@ -34,6 +35,7 @@ public final class Heartbeat {
         this.playersOnline = playersOnline;
         this.maxPlayers = maxPlayers;
         this.uptimeSeconds = uptimeSeconds;
+        this.cpuPercent = cpuPercent;
         this.tps = tps;
         this.memory = memory;
         this.worlds = worlds;
@@ -64,7 +66,12 @@ public final class Heartbeat {
             return this;
         }
         return new Heartbeat(protocol, game, software, version, sample, maxPlayers, uptimeSeconds, tps, memory, worlds,
-                playersOnline == null ? players.size() : playersOnline);
+                playersOnline == null ? players.size() : playersOnline, cpuPercent);
+    }
+
+    public Heartbeat withCpuPercent(Double cpuPercent) {
+        return new Heartbeat(protocol, game, software, version, players, maxPlayers, uptimeSeconds, tps, memory, worlds,
+                playersOnline, cpuPercent);
     }
 
     public int maxPlayers() {

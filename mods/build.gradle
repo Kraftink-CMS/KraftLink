@@ -1,3 +1,9 @@
+import org.gradle.api.attributes.java.TargetJvmVersion
+
+plugins {
+    id 'base'
+}
+
 def mavenVersion = (file('../pom.xml').text =~ /<version>([^<]+)<\/version>/)
 if (!mavenVersion.find()) {
     throw new GradleException('KraftLink version is missing from pom.xml')
@@ -5,6 +11,7 @@ if (!mavenVersion.find()) {
 def kraftLinkVersion = mavenVersion.group(1)
 def artifacts = layout.projectDirectory.dir('../target')
 def runtimeJar = file("../common/target/KraftLink-mod-runtime-${kraftLinkVersion}.jar")
+def platformsJar = file("../all/target/KraftLink-platforms-${kraftLinkVersion}.jar")
 def sharedSources = file('src/main/java')
 def kraftLinkLicense = file('../LICENSE')
 
@@ -20,6 +27,10 @@ subprojects {
         toolchain.languageVersion = JavaLanguageVersion.of(25)
     }
 
+    configurations.named('compileClasspath') {
+        attributes.attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 25)
+    }
+
     sourceSets.main.java.srcDir(sharedSources)
 
     dependencies {
@@ -27,8 +38,10 @@ subprojects {
     }
 
     tasks.withType(JavaCompile).configureEach {
+        // The loaders require Java 25. Emit Java 8 bytecode so older loaders can scan the universal JAR.
+        sourceCompatibility = '8'
+        targetCompatibility = '8'
         options.encoding = 'UTF-8'
-        options.release = 25
         doFirst {
             if (!runtimeJar.isFile()) {
                 throw new GradleException('Run mvn package in the KraftLink directory before building the mods.')
@@ -53,4 +66,30 @@ subprojects {
         from(kraftLinkLicense)
         manifest.attributes('Multi-Release': 'true')
     }
+}
+
+def universalJar = tasks.register('universalJar', Jar) {
+    destinationDirectory = artifacts
+    archiveFileName = 'KraftLink.jar'
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+    manifest.attributes('Multi-Release': 'true', 'Fabric-Mapping-Namespace': 'official')
+    from(zipTree(platformsJar)) {
+        exclude 'META-INF/MANIFEST.MF'
+    }
+    from(kraftLinkLicense)
+    subprojects.each { platform ->
+        dependsOn platform.tasks.named('classes')
+        from(platform.sourceSets.main.output) {
+            if (platform.name != 'fabric') {
+                exclude 'fr/nivcoo/kraftlink/minecraft/**'
+            }
+        }
+    }
+}
+
+tasks.named('assemble') {
+    dependsOn universalJar
+    dependsOn subprojects.collect { it.tasks.named('assemble') }
 }

@@ -1,5 +1,6 @@
 package fr.nivcoo.kraftlink.service;
 
+import com.sun.management.OperatingSystemMXBean;
 import fr.nivcoo.kraftlink.api.KraftLinkApi;
 import fr.nivcoo.kraftlink.api.KraftLinkRegistration;
 import fr.nivcoo.kraftlink.api.KraftLinkRequestException;
@@ -21,6 +22,7 @@ import fr.nivcoo.kraftlink.platform.ServerPlatform;
 import fr.nivcoo.kraftlink.storage.CommandJournal;
 
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -360,6 +362,9 @@ public final class DeliveryEngine implements AutoCloseable {
         List<InGameSignInPlayer> players = canBatch ? signInPlayers(current, now) : Collections.emptyList();
         Heartbeat snapshot = heartbeatDue || !channels.isEmpty()
                 ? platform.snapshot().toCompletableFuture().get(10, TimeUnit.SECONDS) : null;
+        if (heartbeatDue) {
+            snapshot = snapshot.withCpuPercent(processCpuPercent());
+        }
         Heartbeat commandSnapshot = channels.isEmpty()
                 ? null : snapshot.withPlayerSample(commandPlayers.next(snapshot.players()));
         if (batchHeartbeat) {
@@ -406,6 +411,20 @@ public final class DeliveryEngine implements AutoCloseable {
         if (!channels.isEmpty()) {
             claimCommands(current, now, commandSnapshot, channels, batchChannel, result);
         }
+    }
+
+    private static Double processCpuPercent() {
+        try {
+            java.lang.management.OperatingSystemMXBean bean = ManagementFactory.getOperatingSystemMXBean();
+            if (bean instanceof OperatingSystemMXBean) {
+                double load = ((OperatingSystemMXBean) bean).getProcessCpuLoad();
+                return load >= 0 && load <= 1 ? load * 100 : null;
+            }
+        } catch (SecurityException | UnsupportedOperationException | LinkageError unavailable) {
+            return null;
+        }
+
+        return null;
     }
 
     private List<MainConfig.Channel> claimableChannels(MainConfig current, long now) {

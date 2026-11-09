@@ -40,7 +40,7 @@ public final class SkinsRestorerHook implements LinkPollOperation, AutoCloseable
     private static final int PLAYER_LIMIT = 40;
     private static final int JOB_LIMIT = 16;
     private static final int PNG_LIMIT = 32 * 1024;
-    private static final int PROPERTY_LIMIT = 4096;
+    private static final int SIGNED_SKIN_CACHE_LIMIT = 64;
     private static final byte[] PNG_HEADER = {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
     private final Plugin dependency;
     private final BukkitPlatform platform;
@@ -48,6 +48,7 @@ public final class SkinsRestorerHook implements LinkPollOperation, AutoCloseable
     private final SkinsRestorer skins;
     private final KraftLinkRegistration registration;
     private final Map<String, Map<String, Object>> pending = new LinkedHashMap<>();
+    private final LinkedHashMap<UUID, GeneratedSkin> generatedSkins = new LinkedHashMap<>(16, 0.75f, true);
     private final ThreadPoolExecutor worker = new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS,
             new ArrayBlockingQueue<>(JOB_LIMIT), action -> {
                 Thread thread = new Thread(action, "kraftlink-skins");
@@ -169,7 +170,7 @@ public final class SkinsRestorerHook implements LinkPollOperation, AutoCloseable
         String status = "error";
         try {
             if (active(config)) {
-                status = synchronize(uuid, job, result, config);
+                status = synchronize(uuid, job, config);
             }
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
@@ -187,7 +188,7 @@ public final class SkinsRestorerHook implements LinkPollOperation, AutoCloseable
         }
     }
 
-    private String synchronize(UUID uuid, Map<?, ?> job, Map<String, Object> result, MainConfig config)
+    private String synchronize(UUID uuid, Map<?, ?> job, MainConfig config)
             throws DataRequestException, MineSkinException, ExecutionException, TimeoutException,
             InterruptedException {
         String playerName = await(platform.withOnlinePlayer(uuid, Player::getName));
@@ -197,23 +198,22 @@ public final class SkinsRestorerHook implements LinkPollOperation, AutoCloseable
         if (!active(config)) {
             return "error";
         }
-        if (Boolean.TRUE.equals(job.get("read"))) {
-            SkinProperty property = skins.getPlayerStorage().getSkinForPlayer(uuid, playerName).orElse(null);
-            return putProperty(result, property) ? "read" : "missing";
-        }
-
         SkinIdentifier identifier = SkinIdentifier.ofCustom("kraftlink_" + uuid.toString().replace("-", ""));
         SkinProperty property;
         if (Boolean.TRUE.equals(job.get("reset"))) {
-            if (skins.getPlayerStorage().getSkinIdOfPlayer(uuid).filter(identifier::equals).isPresent()) {
+            generatedSkins.remove(uuid);
+            boolean selected = skins.getPlayerStorage().getSkinIdOfPlayer(uuid).filter(identifier::equals).isPresent();
+            if (selected) {
                 skins.getPlayerStorage().removeSkinIdOfPlayer(uuid);
             }
             skins.getSkinStorage().removeSkinData(identifier);
+            if (!selected) {
+                return "applied";
+            }
             property = skins.getPlayerStorage().getSkinForPlayer(uuid, playerName).orElse(PropertyUtils.EMPTY_SKIN);
         } else {
-            boolean generated = job.containsKey("png");
-            property = generated ? generate(job) : signed(job);
-            if (property == null || (generated && !putProperty(result, property)) || !active(config)) {
+            property = generate(uuid, job);
+            if (property == null || !active(config)) {
                 return "error";
             }
             skins.getSkinStorage().setCustomSkinData(identifier.getIdentifier(), property);
@@ -235,16 +235,7 @@ public final class SkinsRestorerHook implements LinkPollOperation, AutoCloseable
         return running && dependency.isEnabled() && config == engine.config();
     }
 
-    private SkinProperty signed(Map<?, ?> job) {
-        String value = string(job.get("value"), PROPERTY_LIMIT);
-        String signature = string(job.get("signature"), PROPERTY_LIMIT);
-        if (!base64(value) || !base64(signature)) {
-            return null;
-        }
-        return SkinProperty.of(value, signature);
-    }
-
-    private SkinProperty generate(Map<?, ?> job) throws DataRequestException, MineSkinException {
+    private SkinProperty generate(UUID uuid, Map<?, ?> job) throws DataRequestException, MineSkinException {
         String image = string(job.get("png"), (PNG_LIMIT + 2) / 3 * 4);
         String model = string(job.get("variant"), 7);
         if (!base64(image) || !(model.isEmpty() || model.equals("classic") || model.equals("slim"))) {
@@ -259,17 +250,21 @@ public final class SkinsRestorerHook implements LinkPollOperation, AutoCloseable
             return null;
         }
         SkinVariant variant = model.equals("slim") ? SkinVariant.SLIM : SkinVariant.CLASSIC;
-        return skins.getMineSkinAPI().genSkin(png, variant).getProperty();
-    }
-
-    private boolean putProperty(Map<String, Object> result, SkinProperty property) {
-        if (property == null || !base64(string(property.getValue(), PROPERTY_LIMIT)) ||
-                !base64(string(property.getSignature(), PROPERTY_LIMIT))) {
-            return false;
+        GeneratedSkin cached = generatedSkins.get(uuid);
+        if (cached != null && cached.variant == variant && Arrays.equals(cached.png, png)) {
+            return cached.property;
         }
-        result.put("value", property.getValue());
-        result.put("signature", property.getSignature());
-        return true;
+        generatedSkins.remove(uuid);
+
+        SkinProperty property = skins.getMineSkinAPI().genSkin(png, variant).getProperty();
+        if (property != null) {
+            generatedSkins.put(uuid, new GeneratedSkin(png, variant, property));
+            if (generatedSkins.size() > SIGNED_SKIN_CACHE_LIMIT) {
+                generatedSkins.remove(generatedSkins.keySet().iterator().next());
+            }
+        }
+
+        return property;
     }
 
     private static boolean base64(String value) {
@@ -293,6 +288,18 @@ public final class SkinsRestorerHook implements LinkPollOperation, AutoCloseable
         synchronized (pending) {
             pending.clear();
             sent = Collections.emptyMap();
+        }
+    }
+
+    private static final class GeneratedSkin {
+        private final byte[] png;
+        private final SkinVariant variant;
+        private final SkinProperty property;
+
+        private GeneratedSkin(byte[] png, SkinVariant variant, SkinProperty property) {
+            this.png = png;
+            this.variant = variant;
+            this.property = property;
         }
     }
 }
