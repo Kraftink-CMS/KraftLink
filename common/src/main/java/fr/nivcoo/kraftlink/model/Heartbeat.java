@@ -18,15 +18,16 @@ public final class Heartbeat {
     private final List<Double> tps;
     private final Memory memory;
     private final List<WorldStatus> worlds;
+    private final Boolean identityVerification;
 
     public Heartbeat(int protocol, String game, String software, String version, List<PlayerIdentity> players,
                      int maxPlayers, long uptimeSeconds, List<Double> tps, Memory memory, List<WorldStatus> worlds) {
-        this(protocol, game, software, version, players, maxPlayers, uptimeSeconds, tps, memory, worlds, null, null);
+        this(protocol, game, software, version, players, maxPlayers, uptimeSeconds, tps, memory, worlds, null, null, null);
     }
 
     private Heartbeat(int protocol, String game, String software, String version, List<PlayerIdentity> players,
                       int maxPlayers, long uptimeSeconds, List<Double> tps, Memory memory, List<WorldStatus> worlds,
-                      Integer playersOnline, Double cpuPercent) {
+                      Integer playersOnline, Double cpuPercent, Boolean identityVerification) {
         this.protocol = protocol;
         this.game = game;
         this.software = software;
@@ -39,6 +40,7 @@ public final class Heartbeat {
         this.tps = tps;
         this.memory = memory;
         this.worlds = worlds;
+        this.identityVerification = identityVerification;
     }
 
     public int protocol() {
@@ -66,12 +68,17 @@ public final class Heartbeat {
             return this;
         }
         return new Heartbeat(protocol, game, software, version, sample, maxPlayers, uptimeSeconds, tps, memory, worlds,
-                playersOnline == null ? players.size() : playersOnline, cpuPercent);
+                playersOnline == null ? players.size() : playersOnline, cpuPercent, identityVerification);
     }
 
     public Heartbeat withCpuPercent(Double cpuPercent) {
         return new Heartbeat(protocol, game, software, version, players, maxPlayers, uptimeSeconds, tps, memory, worlds,
-                playersOnline, cpuPercent);
+                playersOnline, cpuPercent, identityVerification);
+    }
+
+    public Heartbeat withIdentityVerification(boolean available) {
+        return new Heartbeat(protocol, game, software, version, players, maxPlayers, uptimeSeconds, tps, memory, worlds,
+                playersOnline, cpuPercent, available);
     }
 
     public int maxPlayers() {

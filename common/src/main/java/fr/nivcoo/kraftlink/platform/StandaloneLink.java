@@ -7,6 +7,7 @@ import fr.nivcoo.kraftlink.command.ConnectionCommandHandler;
 import fr.nivcoo.kraftlink.config.LinkInstance;
 import fr.nivcoo.kraftlink.config.MainConfig;
 import fr.nivcoo.kraftlink.http.HttpLinkTransport;
+import fr.nivcoo.kraftlink.model.BedrockIdentity;
 import fr.nivcoo.kraftlink.service.DeliveryEngine;
 import fr.nivcoo.kraftlink.storage.CommandJournal;
 
@@ -14,6 +15,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -63,6 +65,16 @@ public final class StandaloneLink implements AutoCloseable {
         }
         String arguments = input.trim();
         handler.execute("kraftlink", arguments.isEmpty() ? new String[0] : arguments.split("\\s+"), allowed, reply);
+    }
+
+    public void link(String label, String[] arguments, boolean allowed, Supplier<BedrockIdentity> player,
+                     Consumer<String> reply) {
+        ConnectionCommandHandler handler = commands.get();
+        if (handler == null) {
+            reply.accept("KraftLink is unavailable.");
+            return;
+        }
+        handler.link(label, arguments, allowed, player, reply);
     }
 
     @Override

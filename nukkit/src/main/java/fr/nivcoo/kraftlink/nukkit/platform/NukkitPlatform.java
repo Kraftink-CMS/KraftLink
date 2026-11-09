@@ -4,12 +4,14 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.utils.LoginChainData;
+import fr.nivcoo.kraftlink.model.BedrockIdentity;
 import fr.nivcoo.kraftlink.model.Delivery;
 import fr.nivcoo.kraftlink.model.Heartbeat;
 import fr.nivcoo.kraftlink.platform.ExecutionResult;
 import fr.nivcoo.kraftlink.platform.ServerPlatform;
 
 import java.lang.management.ManagementFactory;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -42,7 +44,8 @@ public final class NukkitPlatform implements ServerPlatform {
                     new Heartbeat.Memory(runtime.totalMemory() - runtime.freeMemory(), runtime.maxMemory()),
                     server.getLevels().values().stream()
                             .map(world -> new Heartbeat.WorldStatus(world.getName(), world.getPlayers().size()))
-                            .collect(Collectors.toList()));
+                            .collect(Collectors.toList()))
+                    .withIdentityVerification(server.xboxAuth);
         });
     }
 
@@ -76,12 +79,31 @@ public final class NukkitPlatform implements ServerPlatform {
     }
 
     private UUID identity(Player player) {
-        LoginChainData chain = player.getLoginChainData();
-        String xuid = chain != null && chain.isXboxAuthed() ? chain.getXUID() : null;
-        if (xuid != null && xuid.matches("[1-9][0-9]{0,18}")) {
-            return new UUID(0, Long.parseUnsignedLong(xuid));
+        UUID signed = BedrockIdentity.xboxUuid(authenticatedXuid(player.getLoginChainData()));
+        if (signed != null) {
+            return signed;
         }
-        return player.getUniqueId();
+        UUID client = player.getUniqueId();
+        if (client.getMostSignificantBits() == 0) {
+            return UUID.nameUUIDFromBytes(("kraftlink:nukkit:client:" + client).getBytes(StandardCharsets.UTF_8));
+        }
+        return client;
+    }
+
+    public BedrockIdentity xboxIdentity(Player player) {
+        if (!server.xboxAuth || !player.isOnline()) {
+            return null;
+        }
+        LoginChainData chain = player.getLoginChainData();
+        String xuid = authenticatedXuid(chain);
+        if (BedrockIdentity.xboxUuid(xuid) == null) {
+            return null;
+        }
+        return new BedrockIdentity(xuid, chain.getUsername(), false);
+    }
+
+    private String authenticatedXuid(LoginChainData chain) {
+        return chain != null && chain.isXboxAuthed() ? chain.getXUID() : null;
     }
 
     public void run(Runnable action) {

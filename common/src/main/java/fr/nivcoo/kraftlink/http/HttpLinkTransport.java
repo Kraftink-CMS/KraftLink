@@ -3,6 +3,7 @@ package fr.nivcoo.kraftlink.http;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
+import fr.nivcoo.kraftlink.api.KraftLinkPlatform;
 import fr.nivcoo.kraftlink.api.KraftLinkRequestException;
 import fr.nivcoo.kraftlink.config.LinkInstance;
 import fr.nivcoo.kraftlink.config.MainConfig;
@@ -29,6 +30,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -131,11 +133,21 @@ public final class HttpLinkTransport implements LinkTransport {
             throws IOException, InterruptedException {
         JsonObject body = new JsonObject();
         body.addProperty("code", code);
-        body.addProperty("xuid", identity.xuid());
         body.addProperty("username", identity.username());
+        String path = "/api/link/bedrock/verify";
+        if (instance.platform() == KraftLinkPlatform.NUKKIT) {
+            UUID uuid = BedrockIdentity.xboxUuid(identity.xuid());
+            if (uuid == null) {
+                throw new IOException("Invalid Xbox identity");
+            }
+            path = "/api/link/player-identity/verify";
+            body.addProperty("uuid", uuid.toString());
+        } else {
+            body.addProperty("xuid", identity.xuid());
+        }
         JsonObject response;
         try {
-            response = request(config, "/api/link/bedrock/verify", config.token, body);
+            response = request(config, path, config.token, body);
         } catch (KraftLinkRequestException error) {
             if (error.status() == 404) {
                 return false;
@@ -188,6 +200,9 @@ public final class HttpLinkTransport implements LinkTransport {
             connection.setRequestProperty("Authorization", "Bearer " + token);
             connection.setRequestProperty("X-KraftLink-Instance", instance.id().toString());
             connection.setRequestProperty("X-KraftLink-Platform", instance.platform().name().toLowerCase(Locale.ROOT));
+            if (instance.platform() == KraftLinkPlatform.NUKKIT) {
+                connection.setRequestProperty("X-KraftLink-Identity-Targets", "xbox-xuid");
+            }
             connection.setRequestProperty("Content-Type", "application/json");
             connection.setRequestProperty("Accept", "application/json");
             connection.setRequestProperty("User-Agent", "KraftLink");

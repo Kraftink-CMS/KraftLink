@@ -6,8 +6,9 @@ description: KraftInk server connection
 author: nivcoo
 commands:
   kraftlink:
-    description: Manage the KraftInk server connection
-    permission: kraftlink.admin
+    description: Manage the KraftInk server connection or link a Bedrock account
 permissions:
   kraftlink.admin:
     default: op
+  kraftlink.link:
+    default: true
