@@ -1,0 +1,13 @@
+name: KraftLink
+version: '${project.version}'
+main: fr.nivcoo.kraftlink.nukkit.KraftLink
+api: ['1.1.0']
+description: KraftInk server connection
+author: nivcoo
+commands:
+  kraftlink:
+    description: Manage the KraftInk server connection
+    permission: kraftlink.admin
+permissions:
+  kraftlink.admin:
+    default: op

@@ -3,5 +3,10 @@ package fr.nivcoo.kraftlink.api;
 public enum KraftLinkPlatform {
     BUKKIT,
     VELOCITY,
-    HYTALE
+    HYTALE,
+    FABRIC,
+    FORGE,
+    NEOFORGE,
+    SPONGE,
+    NUKKIT
 }

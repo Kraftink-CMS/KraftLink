@@ -28,6 +28,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -138,6 +139,25 @@ public class BukkitPlatform implements ServerPlatform, InGameSignInPlatform {
         return onServerThread(action);
     }
 
+    public CompletionStage<List<Heartbeat.PlayerIdentity>> onlinePlayers() {
+        return onServerThread(this::playerIdentities);
+    }
+
+    public <T> CompletionStage<T> withOnlinePlayer(UUID uuid, Function<Player, T> action) {
+        return onServerThread(() -> Bukkit.getPlayer(uuid)).thenCompose(player -> {
+            if (player == null) {
+                return CompletableFuture.completedFuture(null);
+            }
+            return onPlayerThread(player, () -> player.isOnline() ? action.apply(player) : null);
+        });
+    }
+
+    private List<Heartbeat.PlayerIdentity> playerIdentities() {
+        return Bukkit.getOnlinePlayers().stream()
+                .map(player -> new Heartbeat.PlayerIdentity(player.getUniqueId().toString(), player.getName()))
+                .collect(Collectors.toList());
+    }
+
     protected boolean standaloneOnlineMode() {
         return Bukkit.getOnlineMode() && !Bukkit.spigot().getConfig().getBoolean("settings.bungeecord");
     }
@@ -176,9 +196,7 @@ public class BukkitPlatform implements ServerPlatform, InGameSignInPlatform {
         return onServerThread(() -> {
             Runtime runtime = Runtime.getRuntime();
             return new Heartbeat(1, "minecraft", Bukkit.getName(), version(),
-                    Bukkit.getOnlinePlayers().stream()
-                            .map(player -> new Heartbeat.PlayerIdentity(player.getUniqueId().toString(), player.getName()))
-                            .collect(Collectors.toList()),
+                    playerIdentities(),
                     Bukkit.getMaxPlayers(), ManagementFactory.getRuntimeMXBean().getUptime() / 1000, tps(),
                     new Heartbeat.Memory(runtime.totalMemory() - runtime.freeMemory(), runtime.maxMemory()),
                     Bukkit.getWorlds().stream()
