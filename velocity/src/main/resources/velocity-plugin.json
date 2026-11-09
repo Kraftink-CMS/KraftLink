@@ -4,5 +4,6 @@
     "version": "${project.version}",
     "description": "Connect the proxy to KraftInk.",
     "authors": ["nivcoo"],
+    "dependencies": [{"id": "floodgate", "optional": true}],
     "main": "fr.nivcoo.kraftlink.velocity.KraftLink"
 }

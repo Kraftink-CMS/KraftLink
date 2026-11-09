@@ -41,5 +41,8 @@ runs:
           [[ -f "target/$jar" && ! -L "target/$jar" ]]
           cp -- "target/$jar" "$OUTPUT_DIRECTORY/"
         done
+        api_jar="api/target/KraftLink-API-$VERSION.jar"
+        [[ -f "$api_jar" && ! -L "$api_jar" ]]
+        cp -- "$api_jar" "$OUTPUT_DIRECTORY/"
         cd "$OUTPUT_DIRECTORY"
         sha256sum -- *.jar > SHA256SUMS

@@ -31,4 +31,8 @@ public final class ExecutionResult {
     public static ExecutionResult deferred(String reason) {
         return new ExecutionResult(State.DEFERRED, reason);
     }
+
+    public static ExecutionResult playerMismatch() {
+        return new ExecutionResult(State.FAILED, "Player name does not match the UUID");
+    }
 }

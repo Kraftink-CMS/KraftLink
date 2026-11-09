@@ -10,6 +10,7 @@
     <version>1.0.2-dev</version>
     <packaging>pom</packaging>
     <modules>
+        <module>api</module>
         <module>common</module>
         <module>bukkit</module>
         <module>velocity</module>
