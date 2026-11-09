@@ -11,9 +11,6 @@
         <version>1.4.1-dev</version>
     </parent>
     <artifactId>KraftLink-Sponge</artifactId>
-    <properties>
-        <maven.compiler.release>21</maven.compiler.release>
-    </properties>
     <repositories>
         <repository>
             <id>spongepowered</id>

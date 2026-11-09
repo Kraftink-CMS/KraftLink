@@ -58,6 +58,10 @@
                                 <pattern>com.google.gson</pattern>
                                 <shadedPattern>fr.nivcoo.kraftlink.lib.gson</shadedPattern>
                             </relocation>
+                            <relocation>
+                                <pattern>com.google.errorprone.annotations</pattern>
+                                <shadedPattern>fr.nivcoo.kraftlink.lib.errorprone</shadedPattern>
+                            </relocation>
                         </relocations>
                         <filters>
                             <filter>

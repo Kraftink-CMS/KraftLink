@@ -6,7 +6,8 @@ KraftLink connects your game server or proxy to KraftInk. It reports server stat
 
 ## Install KraftLink
 
-Download the variant for your platform. `KraftLink.jar` covers Bukkit, Velocity and Hytale. Stop the server and install one KraftLink JAR per instance.
+Starting with KraftLink 1.4.1, the universal `KraftLink.jar` includes all eight platform integrations. You can also choose
+the dedicated variant for your platform. Stop the server and install one KraftLink JAR per instance.
 
 | Platform                        | Dedicated JAR                    | Installation folder |
 | ------------------------------- | -------------------------------- | ------------------- |
@@ -16,10 +17,16 @@ Download the variant for your platform. `KraftLink.jar` covers Bukkit, Velocity 
 | Fabric                          | `KraftLink-Fabric-VERSION.jar`   | `mods/`             |
 | Forge                           | `KraftLink-Forge-VERSION.jar`    | `mods/`             |
 | NeoForge                        | `KraftLink-NeoForge-VERSION.jar` | `mods/`             |
-| Sponge                          | `KraftLink-Sponge-VERSION.jar`   | `mods/`             |
+| Sponge                          | `KraftLink-Sponge-VERSION.jar`   | `mods/plugins/`     |
 | Nukkit                          | `KraftLink-Nukkit-VERSION.jar`   | `plugins/`          |
 
 The Bukkit variant supports Minecraft from 1.8.8 and targets Java 8. The Hytale variant is built against server 0.7.4. Fabric, Forge and NeoForge target Minecraft Java 26.1.2 and require Java 25. Install Fabric API for Fabric. Sponge targets SpongeAPI 17 on Minecraft Java 1.21.10. The Nukkit variant targets Cloudburst Nukkit API 1.1 and connects to a Minecraft Bedrock server. Use the Java version required by your server or proxy.
+
+On SpongeVanilla and SpongeForge, put either JAR in `mods/plugins/`. Use the dedicated Sponge JAR on SpongeNeo so that
+the NeoForge loader discovers KraftLink as a Sponge plugin.
+
+On Nukkit, the universal JAR loads the plugin and may log a warning while looking for a Bedrock resource pack in the
+Hytale manifest. Use the dedicated Nukkit JAR to avoid that warning.
 
 1. In KraftInk, open **Servers → Game servers**, add a KraftLink connection and generate a connection token.
 2. Restart the server. Set `cms_url` to your KraftInk site's HTTPS address and enter the connection `token` in KraftLink's generated `config.json`. To run commands, list the allowed command names in `allowed_command_roots`.
