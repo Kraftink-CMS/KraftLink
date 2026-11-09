@@ -8,7 +8,7 @@
     <parent>
         <groupId>fr.nivcoo.kraftink</groupId>
         <artifactId>KraftLink-parent</artifactId>
-        <version>1.3.2</version>
+        <version>1.3.3</version>
     </parent>
     <artifactId>KraftLink-Bukkit</artifactId>
     <repositories>
@@ -54,38 +54,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>shade</goal>
-                        </goals>
-                        <configuration>
-                            <createDependencyReducedPom>false</createDependencyReducedPom>
-                            <outputFile>${project.basedir}/../target/${project.artifactId}-${project.version}.jar</outputFile>
-                            <relocations>
-                                <relocation>
-                                    <pattern>com.google.gson</pattern>
-                                    <shadedPattern>fr.nivcoo.kraftlink.lib.gson</shadedPattern>
-                                </relocation>
-                            </relocations>
-                            <filters>
-                                <filter>
-                                    <artifact>*:*</artifact>
-                                    <excludes>
-                                        <exclude>META-INF/*.SF</exclude>
-                                        <exclude>META-INF/*.RSA</exclude>
-                                        <exclude>META-INF/*.DSA</exclude>
-                                        <exclude>META-INF/maven/**</exclude>
-                                        <exclude>META-INF/proguard/**</exclude>
-                                        <exclude>module-info.class</exclude>
-                                        <exclude>META-INF/versions/**/module-info.class</exclude>
-                                    </excludes>
-                                </filter>
-                            </filters>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
         </plugins>
     </build>
