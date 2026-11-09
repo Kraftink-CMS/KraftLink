@@ -47,9 +47,7 @@ public final class KraftLink extends JavaPlugin implements KraftLinkProvider {
             PluginCommand command = Objects.requireNonNull(getCommand("kraftlink"));
             command.setExecutor(executor);
             command.setTabCompleter(executor);
-            if (config.bedrockLinkEnabled) {
-                registerLinkShortcut(executor);
-            }
+            registerLinkShortcut(executor);
             platform.registerSignInMenu();
             installAuthMeRegistration();
             engine.start();
@@ -93,10 +91,9 @@ public final class KraftLink extends JavaPlugin implements KraftLinkProvider {
         ClassLoader serverClasses = getServer().getClass().getClassLoader();
         if (serverClasses.getResource("io/papermc/paper/command/brigadier/BasicCommand.class") == null
                 || serverClasses.getResource("io/papermc/paper/plugin/lifecycle/event/types/LifecycleEvents.class") == null) {
-            getLogger().info("The /link shortcut is unavailable on this server. Use /kraftlink link.");
             return;
         }
-        PaperLinkCommand.register(this, executor, () -> engine.config().bedrockLinkEnabled);
+        PaperLinkCommand.register(this, executor);
     }
 
     private void installAuthMeRegistration() {

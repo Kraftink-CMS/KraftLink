@@ -99,8 +99,7 @@ public final class KraftLinkCommand implements SimpleCommand {
         @Override
         public boolean hasPermission(Invocation invocation) {
             CommandSource source = invocation.source();
-            if (!plugin.running() || !plugin.engine().config().bedrockLinkEnabled
-                    || !(source instanceof Player) || !canLink(source) || !hasFloodgate()) return false;
+            if (!plugin.running() || !(source instanceof Player) || !canLink(source) || !hasFloodgate()) return false;
             Player player = (Player) source;
             return player.isActive() && FloodgateProfiles.isPlayer(player.getUniqueId());
         }

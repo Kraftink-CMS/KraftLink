@@ -34,7 +34,6 @@ public final class MainConfig {
 
     public String cmsUrl = "";
     public String token = "";
-    public boolean bedrockLinkEnabled = false;
     public String heartbeatPath = DEFAULT_HEARTBEAT_PATH;
     public int heartbeatSeconds = 30;
     public int pollSeconds = 5;
@@ -186,12 +185,12 @@ public final class MainConfig {
         public String usage = "/{label} status|reload|uncertain|resolve <id> delivered|retry";
         public String linkUsage = "/{label} link <code from the website>";
         public String linkShortcutUsage = "/{label} <code from the website>";
-        public String linkDisabled = "Bedrock account linking is disabled on this server.";
         public String linkPlayerOnly = "Run this command from your Bedrock account in game.";
         public String linkFloodgateRequired = "Join this server with your authenticated Bedrock account to link it.";
         public String linkJavaRequired = "Your Bedrock account is already linked to Java on this server. Choose Minecraft Java (Microsoft) on the website.";
         public String linkUnavailable = "Bedrock verification is unavailable here. Use the server shown on the website or try again later.";
         public String linkRejected = "This code is invalid, expired or already used. Check the verification page.";
+        public String linkRetry = "Wait a few seconds before trying again.";
         public String linkAccepted = "Bedrock account verified. Return to the website to finish linking.";
         public SignInMessages inGameSignIn = new SignInMessages();
 
@@ -199,9 +198,9 @@ public final class MainConfig {
             if (permissionDenied == null || status == null || uncertainEntry == null || reloaded == null
                     || reloadRejected == null || resolved == null || notUncertain == null
                     || journalFailed == null || usage == null || linkUsage == null || linkShortcutUsage == null
-                    || linkDisabled == null || linkPlayerOnly == null
+                    || linkPlayerOnly == null
                     || linkFloodgateRequired == null || linkJavaRequired == null || linkUnavailable == null || linkRejected == null
-                    || linkAccepted == null || inGameSignIn == null) {
+                    || linkRetry == null || linkAccepted == null || inGameSignIn == null) {
                 throw new IllegalArgumentException("Missing KraftLink command message");
             }
             inGameSignIn.validate();

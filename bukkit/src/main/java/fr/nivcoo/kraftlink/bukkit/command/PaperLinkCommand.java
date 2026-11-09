@@ -8,8 +8,6 @@ import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bukkit.command.CommandMap;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.function.BooleanSupplier;
-
 public final class PaperLinkCommand implements BasicCommand {
 
     private static final String LABEL = "link";
@@ -21,9 +19,9 @@ public final class PaperLinkCommand implements BasicCommand {
         this.executor = executor;
     }
 
-    public static void register(JavaPlugin plugin, KraftLinkCommand executor, BooleanSupplier enabled) {
+    public static void register(JavaPlugin plugin, KraftLinkCommand executor) {
         plugin.getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS.newHandler(event -> {
-            if (!plugin.isEnabled() || !enabled.getAsBoolean()) {
+            if (!plugin.isEnabled()) {
                 return;
             }
             Commands commands = event.registrar();
