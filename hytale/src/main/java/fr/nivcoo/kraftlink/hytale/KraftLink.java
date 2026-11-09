@@ -50,11 +50,14 @@ public final class KraftLink extends JavaPlugin implements KraftLinkProvider {
     @Override
     protected void start() {
         engine.start();
-        api = engine.api();
+        KraftLinkApi startedApi = engine.api();
+        KraftLinkProvider.register(startedApi);
+        api = startedApi;
     }
 
     @Override
     protected void shutdown() {
+        KraftLinkProvider.unregister(api);
         api = null;
         if (engine == null) return;
         try {

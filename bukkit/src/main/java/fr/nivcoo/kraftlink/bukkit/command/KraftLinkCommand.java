@@ -30,9 +30,7 @@ public final class KraftLinkCommand implements TabExecutor {
 
     @Override
     public boolean onCommand(final CommandSender sender, Command command, String label, String[] args) {
-        Consumer<String> reply = message -> {
-            if (plugin.isEnabled() && engine.running()) platform.send(sender, message);
-        };
+        Consumer<String> reply = message -> send(sender, message);
         if (args.length > 0 && args[0].equalsIgnoreCase("link")) {
             handler.link(label, args, sender.hasPermission("kraftlink.link"),
                     sender instanceof Player ? () -> bedrock((Player) sender) : null, reply);
@@ -44,6 +42,14 @@ public final class KraftLinkCommand implements TabExecutor {
             handler.execute(label, args, sender.hasPermission("kraftlink.admin"), reply);
         }
         return true;
+    }
+
+    void linkShortcut(CommandSender sender, String[] args) {
+        if (plugin.isEnabled()) {
+            handler.linkShortcut("link", args, sender.hasPermission("kraftlink.link"),
+                    sender instanceof Player ? () -> bedrock((Player) sender) : null,
+                    message -> send(sender, message));
+        }
     }
 
     @Override
@@ -58,5 +64,11 @@ public final class KraftLinkCommand implements TabExecutor {
 
     private BedrockIdentity bedrock(Player player) {
         return hasFloodgate() && player.isOnline() ? FloodgateProfiles.find(player.getUniqueId()) : null;
+    }
+
+    private void send(CommandSender sender, String message) {
+        if (plugin.isEnabled() && engine.running()) {
+            platform.send(sender, message);
+        }
     }
 }

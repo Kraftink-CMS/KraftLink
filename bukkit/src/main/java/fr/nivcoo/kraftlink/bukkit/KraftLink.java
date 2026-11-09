@@ -4,6 +4,7 @@ import fr.nivcoo.kraftlink.api.KraftLinkApi;
 import fr.nivcoo.kraftlink.api.KraftLinkPlatform;
 import fr.nivcoo.kraftlink.api.KraftLinkProvider;
 import fr.nivcoo.kraftlink.bukkit.command.KraftLinkCommand;
+import fr.nivcoo.kraftlink.bukkit.command.PaperLinkCommand;
 import fr.nivcoo.kraftlink.bukkit.hook.AuthMeRegistrationHook;
 import fr.nivcoo.kraftlink.bukkit.platform.BukkitPlatform;
 import fr.nivcoo.kraftlink.bukkit.platform.PaperPlatform;
@@ -46,6 +47,9 @@ public final class KraftLink extends JavaPlugin implements KraftLinkProvider {
             PluginCommand command = Objects.requireNonNull(getCommand("kraftlink"));
             command.setExecutor(executor);
             command.setTabCompleter(executor);
+            if (config.bedrockLinkEnabled) {
+                registerLinkShortcut(executor);
+            }
             platform.registerSignInMenu();
             installAuthMeRegistration();
             engine.start();
@@ -53,9 +57,11 @@ public final class KraftLink extends JavaPlugin implements KraftLinkProvider {
             if (config.allowedCommandRoots.isEmpty()) {
                 getLogger().info("No server commands are authorized. Configure allowed_command_roots before enabling deliveries.");
             }
-            api = engine.api();
+            KraftLinkApi startedApi = engine.api();
+            KraftLinkProvider.register(startedApi);
+            api = startedApi;
             getServer().getServicesManager().register(KraftLinkApi.class, api, this, ServicePriority.Normal);
-        } catch (IOException | IllegalArgumentException error) {
+        } catch (IOException | IllegalArgumentException | IllegalStateException error) {
             getLogger().log(Level.SEVERE, "KraftLink could not start", error);
             getServer().getPluginManager().disablePlugin(this);
         }
@@ -66,6 +72,7 @@ public final class KraftLink extends JavaPlugin implements KraftLinkProvider {
         KraftLinkApi registeredApi = api;
         api = null;
         if (registeredApi != null) {
+            KraftLinkProvider.unregister(registeredApi);
             getServer().getServicesManager().unregister(KraftLinkApi.class, registeredApi);
         }
         if (authMeRegistration != null) {
@@ -80,6 +87,16 @@ public final class KraftLink extends JavaPlugin implements KraftLinkProvider {
         } catch (IOException error) {
             getLogger().log(Level.SEVERE, "KraftLink journal could not close", error);
         }
+    }
+
+    private void registerLinkShortcut(KraftLinkCommand executor) {
+        ClassLoader serverClasses = getServer().getClass().getClassLoader();
+        if (serverClasses.getResource("io/papermc/paper/command/brigadier/BasicCommand.class") == null
+                || serverClasses.getResource("io/papermc/paper/plugin/lifecycle/event/types/LifecycleEvents.class") == null) {
+            getLogger().info("The /link shortcut is unavailable on this server. Use /kraftlink link.");
+            return;
+        }
+        PaperLinkCommand.register(this, executor, () -> engine.config().bedrockLinkEnabled);
     }
 
     private void installAuthMeRegistration() {
