@@ -67,10 +67,6 @@ public final class MainConfig {
             throw new IllegalArgumentException("Invalid KraftLink configuration");
         }
         config.validate();
-        if ("Bedrock verification is unavailable here. Use the server shown on the website or try again later."
-                .equals(config.messages.linkUnavailable)) {
-            config.messages.linkUnavailable = Messages.DEFAULT_LINK_UNAVAILABLE;
-        }
         return config;
     }
 
@@ -178,8 +174,6 @@ public final class MainConfig {
 
     public static final class Messages {
 
-        private static final String DEFAULT_LINK_UNAVAILABLE = "Bedrock verification is unavailable. Try again later.";
-
         public String permissionDenied = "KraftLink: permission denied.";
         public String status = "KraftLink: {status}, manual review: {uncertain}";
         public String uncertainEntry = "{id} {state}";
@@ -194,7 +188,7 @@ public final class MainConfig {
         public String linkPlayerOnly = "Run this command from your Bedrock account in game.";
         public String linkFloodgateRequired = "Join this server with your authenticated Bedrock account to link it.";
         public String linkJavaRequired = "Your Bedrock account is already linked to Java on this server. Choose Minecraft Java (Microsoft) on the website.";
-        public String linkUnavailable = DEFAULT_LINK_UNAVAILABLE;
+        public String linkUnavailable = "Bedrock verification is unavailable. Try again later.";
         public String linkRejected = "This code is invalid, expired or already used. Check the verification page.";
         public String linkRetry = "Wait a few seconds before trying again.";
         public String linkAccepted = "Bedrock account verified. Return to the website to finish linking.";
