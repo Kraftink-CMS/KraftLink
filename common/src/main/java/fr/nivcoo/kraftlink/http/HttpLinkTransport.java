@@ -1,11 +1,18 @@
 package fr.nivcoo.kraftlink.http;
 
-import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
+import fr.nivcoo.kraftlink.api.KraftLinkRequestException;
+import fr.nivcoo.kraftlink.config.LinkInstance;
 import fr.nivcoo.kraftlink.config.MainConfig;
+import fr.nivcoo.kraftlink.model.AuthMeRegistration;
+import fr.nivcoo.kraftlink.model.BedrockIdentity;
 import fr.nivcoo.kraftlink.model.Delivery;
+import fr.nivcoo.kraftlink.model.InGameSignInPlayer;
+import fr.nivcoo.kraftlink.model.InGameSignInPrompt;
 import fr.nivcoo.kraftlink.model.Heartbeat;
+import fr.nivcoo.kraftlink.model.LinkCapabilities;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -15,9 +22,14 @@ import java.net.HttpURLConnection;
 import java.net.SocketTimeoutException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -29,53 +41,120 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public final class HttpLinkTransport implements LinkTransport {
 
-    private final ExecutorService executor = Executors.newSingleThreadExecutor(action -> {
-        Thread thread = new Thread(action, "kraftlink-request");
-        thread.setDaemon(true);
-        return thread;
-    });
-    private final AtomicReference<HttpURLConnection> active = new AtomicReference<>();
+    private static final int MAX_RESPONSE_BYTES = 1_048_576;
+    private static final int MAX_ERROR_BYTES = 65_536;
+
+    private final LinkInstance instance;
+    private final RequestLane standard = new RequestLane("kraftlink-request");
+    private final RequestLane extensions = new RequestLane("kraftlink-extension-request");
     private volatile boolean closed;
 
+    public HttpLinkTransport(LinkInstance instance) {
+        this.instance = Objects.requireNonNull(instance, "instance");
+    }
+
     @Override
-    public void heartbeat(MainConfig config, Heartbeat heartbeat) throws IOException, InterruptedException {
-        request(config, config.heartbeatPath, config.token, heartbeat);
+    public LinkPollResponse poll(MainConfig config, LinkPollRequest poll) throws IOException, InterruptedException {
+        try {
+            return new LinkPollResponse(request(config, "/api/link/poll", config.token, poll.body()));
+        } catch (KraftLinkRequestException error) {
+            if (error.status() == 404 || error.status() == 405) {
+                return null;
+            }
+            throw error;
+        }
+    }
+
+    @Override
+    public Map<String, Object> requestOperation(MainConfig config, JsonObject body)
+            throws IOException, InterruptedException {
+        JsonObject data = extensions.request(config, "/api/link/request", config.token, body, true);
+        return LinkPollResponse.objectMap(data);
+    }
+
+    @Override
+    public LinkCapabilities heartbeat(MainConfig config, Heartbeat heartbeat) throws IOException, InterruptedException {
+        return LinkPollResponse.capabilities(request(config, config.heartbeatPath, config.token,
+                LinkPollRequest.heartbeatPayload(heartbeat)));
+    }
+
+    @Override
+    public String respondToInGameSignIn(MainConfig config, InGameSignInPrompt prompt, InGameSignInPlayer player, String selection)
+            throws IOException, InterruptedException {
+        JsonObject body = MainConfig.JSON.toJsonTree(player).getAsJsonObject();
+        body.addProperty("id", prompt.id());
+        if ("reject".equals(selection) || "mute".equals(selection)) {
+            body.addProperty("action", selection);
+        } else {
+            body.addProperty("action", "choose");
+            body.addProperty("choice", Integer.parseInt(selection));
+        }
+        JsonElement state;
+        try {
+            state = request(config, "/api/link/in-game-sign-in/respond", config.token, body).get("state");
+        } catch (KraftLinkRequestException error) {
+            if (error.status() == 404 || error.status() == 409) {
+                return "expired";
+            }
+            throw error;
+        }
+        if (state != null && state.isJsonPrimitive() && state.getAsJsonPrimitive().isString()) {
+            String value = state.getAsString();
+            if ("approved".equals(value) || "rejected".equals(value) || "muted".equals(value)) {
+                return value;
+            }
+        }
+        throw new IOException("Invalid in-game sign-in response");
+    }
+
+    @Override
+    public int registerAuthMe(MainConfig config, AuthMeRegistration registration)
+            throws IOException, InterruptedException {
+        try {
+            JsonElement state = request(config, "/api/link/authme/registration", config.token, registration).get("state");
+            if (state != null && state.isJsonPrimitive() && state.getAsJsonPrimitive().isString()) {
+                if ("created".equals(state.getAsString())) {
+                    return 201;
+                }
+            }
+            throw new IOException("Invalid AuthMe registration response");
+        } catch (KraftLinkRequestException error) {
+            if (error.status() >= 400 && error.status() < 500) {
+                return error.status();
+            }
+            throw error;
+        }
+    }
+
+    @Override
+    public boolean verifyBedrock(MainConfig config, String code, BedrockIdentity identity)
+            throws IOException, InterruptedException {
+        JsonObject body = new JsonObject();
+        body.addProperty("code", code);
+        body.addProperty("xuid", identity.xuid());
+        body.addProperty("username", identity.username());
+        JsonObject response;
+        try {
+            response = request(config, "/api/link/bedrock/verify", config.token, body);
+        } catch (KraftLinkRequestException error) {
+            if (error.status() == 404) {
+                return false;
+            }
+            throw error;
+        }
+        JsonElement verified = response.get("verified");
+        if (verified == null || !verified.isJsonPrimitive() || !verified.getAsJsonPrimitive().isBoolean()
+                || !verified.getAsBoolean()) {
+            throw new IOException("Invalid Bedrock verification response");
+        }
+        return true;
     }
 
     @Override
     public List<Delivery> claim(MainConfig config, MainConfig.Channel channel, Heartbeat snapshot)
             throws IOException, InterruptedException {
-        JsonObject body = new JsonObject();
-        body.addProperty("protocol", 1);
-        body.addProperty("limit", 20);
-        JsonArray players = new JsonArray();
-        JsonArray names = new JsonArray();
-        for (Heartbeat.PlayerIdentity player : snapshot.players()) {
-            players.add(player.uuid());
-            names.add(player.name());
-        }
-        body.add("players", players);
-        body.add("player_names", names);
-        JsonObject response = request(config, channel.claimPath, config.token(channel), body);
-        if (!response.has("commands") || !response.get("commands").isJsonArray()) {
-            throw new IOException("Invalid command batch");
-        }
-        JsonArray commands = response.getAsJsonArray("commands");
-        if (commands.size() > 20) {
-            throw new IOException("Command batch exceeds the protocol limit");
-        }
-        Delivery[] deliveries;
-        try {
-            deliveries = MainConfig.JSON.fromJson(commands, Delivery[].class);
-        } catch (JsonParseException error) {
-            throw new IOException("Invalid command batch", error);
-        }
-        for (Delivery delivery : deliveries) {
-            if (delivery == null || !delivery.valid()) {
-                throw new IOException("Invalid delivery payload");
-            }
-        }
-        return Collections.unmodifiableList(Arrays.asList(deliveries));
+        return LinkPollResponse.deliveries(request(config, channel.claimPath, config.token(channel),
+                LinkPollRequest.commandPayload(snapshot)));
     }
 
     @Override
@@ -91,28 +170,13 @@ public final class HttpLinkTransport implements LinkTransport {
         request(config, path, config.token(channel), body);
     }
 
-    private synchronized JsonObject request(MainConfig config, String path, String token, Object body)
+    private JsonObject request(MainConfig config, String path, String token, Object body)
             throws IOException, InterruptedException {
-        if (closed) throw new IOException("KraftLink transport is closed");
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(config.requestTimeoutSeconds);
-        Future<JsonObject> pending;
-        try {
-            pending = executor.submit(() -> send(config, path, token, body, deadline));
-        } catch (RejectedExecutionException error) {
-            throw new IOException("KraftLink transport is closed", error);
-        }
-        try {
-            return pending.get(config.requestTimeoutSeconds + 1L, TimeUnit.SECONDS);
-        } catch (TimeoutException | ExecutionException error) {
-            cancel(pending);
-            throw new IOException("The KraftLink response could not be read", error);
-        } catch (InterruptedException error) {
-            cancel(pending);
-            throw error;
-        }
+        return standard.request(config, path, token, body, false);
     }
 
-    private JsonObject send(MainConfig config, String path, String token, Object body, long deadline) throws IOException {
+    private JsonObject send(MainConfig config, String path, String token, Object body, long deadline,
+                            AtomicReference<HttpURLConnection> active, boolean extensionRequest) throws IOException {
         HttpURLConnection connection = (HttpURLConnection) config.endpoint(path).toURL().openConnection();
         active.set(connection);
         try {
@@ -122,6 +186,8 @@ public final class HttpLinkTransport implements LinkTransport {
             connection.setInstanceFollowRedirects(false);
             connection.setRequestMethod("POST");
             connection.setRequestProperty("Authorization", "Bearer " + token);
+            connection.setRequestProperty("X-KraftLink-Instance", instance.id().toString());
+            connection.setRequestProperty("X-KraftLink-Platform", instance.platform().name().toLowerCase(Locale.ROOT));
             connection.setRequestProperty("Content-Type", "application/json");
             connection.setRequestProperty("Accept", "application/json");
             connection.setRequestProperty("User-Agent", "KraftLink");
@@ -133,26 +199,13 @@ public final class HttpLinkTransport implements LinkTransport {
             }
             connection.setReadTimeout(remaining(deadline));
             int status = connection.getResponseCode();
-            if (status < 200 || status >= 300) throw new IOException("KraftLink HTTP " + status);
-            if (connection.getContentLengthLong() > 1_048_576) {
-                throw new IOException("KraftLink response exceeds one megabyte");
+            if (status < 200 || status >= 300) {
+                throw new KraftLinkRequestException(status, extensionRequest ? readValidationErrors(connection, deadline)
+                        : Collections.emptyMap());
             }
-            ByteArrayOutputStream content = new ByteArrayOutputStream();
-            try (InputStream input = connection.getInputStream()) {
-                byte[] buffer = new byte[8192];
-                int count;
-                while (true) {
-                    connection.setReadTimeout(remaining(deadline));
-                    count = input.read(buffer);
-                    if (count == -1) break;
-                    if (content.size() + count > 1_048_576) {
-                        throw new IOException("KraftLink response exceeds one megabyte");
-                    }
-                    content.write(buffer, 0, count);
-                }
-            }
-            if (content.size() == 0) return new JsonObject();
-            JsonObject result = MainConfig.JSON.fromJson(new String(content.toByteArray(), StandardCharsets.UTF_8), JsonObject.class);
+            String content = readResponse(connection, connection.getInputStream(), deadline, MAX_RESPONSE_BYTES);
+            if (content.isEmpty() && !extensionRequest) return new JsonObject();
+            JsonObject result = MainConfig.JSON.fromJson(content, JsonObject.class);
             if (result == null || !result.has("success") || !result.get("success").isJsonPrimitive()
                     || !result.getAsJsonPrimitive("success").isBoolean() || !result.get("success").getAsBoolean()
                     || !result.has("data") || !result.get("data").isJsonObject()) {
@@ -166,29 +219,135 @@ public final class HttpLinkTransport implements LinkTransport {
         }
     }
 
+    private String readResponse(HttpURLConnection connection, InputStream stream, long deadline, int limit)
+            throws IOException {
+        try (InputStream input = stream) {
+            if (connection.getContentLengthLong() > limit) {
+                throw new IOException("KraftLink response exceeds the size limit");
+            }
+            ByteArrayOutputStream content = new ByteArrayOutputStream();
+            byte[] buffer = new byte[8192];
+            int count;
+            while (true) {
+                connection.setReadTimeout(remaining(deadline));
+                count = input.read(buffer);
+                if (count == -1) {
+                    return new String(content.toByteArray(), StandardCharsets.UTF_8);
+                }
+                if (content.size() + count > limit) {
+                    throw new IOException("KraftLink response exceeds the size limit");
+                }
+                content.write(buffer, 0, count);
+            }
+        }
+    }
+
+    private Map<String, List<String>> readValidationErrors(HttpURLConnection connection, long deadline) {
+        InputStream input = connection.getErrorStream();
+        if (input == null) {
+            return Collections.emptyMap();
+        }
+        try {
+            JsonObject result = MainConfig.JSON.fromJson(readResponse(connection, input, deadline, MAX_ERROR_BYTES),
+                    JsonObject.class);
+            JsonElement data = result == null ? null : result.get("data");
+            JsonElement errors = data == null || !data.isJsonObject() ? null : data.getAsJsonObject().get("errors");
+            Map<String, List<String>> resultErrors = new LinkedHashMap<>();
+            if (errors != null && errors.isJsonObject()) {
+                errors.getAsJsonObject().entrySet().forEach(entry -> {
+                    if (!entry.getValue().isJsonArray()) {
+                        return;
+                    }
+                    List<String> messages = new ArrayList<>();
+                    for (JsonElement message : entry.getValue().getAsJsonArray()) {
+                        if (message.isJsonPrimitive() && message.getAsJsonPrimitive().isString()) {
+                            messages.add(message.getAsString());
+                        }
+                    }
+                    if (!messages.isEmpty()) {
+                        resultErrors.put(entry.getKey(), messages);
+                    }
+                });
+            }
+            return resultErrors;
+        } catch (IOException | JsonParseException error) {
+            return Collections.emptyMap();
+        }
+    }
+
     private int remaining(long deadline) throws SocketTimeoutException {
         long millis = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
         if (millis <= 0) throw new SocketTimeoutException("KraftLink request timed out");
         return (int) Math.min(millis, Integer.MAX_VALUE);
     }
 
-    private void cancel(Future<?> pending) {
-        pending.cancel(true);
-        disconnect();
-    }
-
-    private void disconnect() {
-        HttpURLConnection connection = active.getAndSet(null);
-        if (connection == null) return;
-        Thread thread = new Thread(connection::disconnect, "kraftlink-disconnect");
-        thread.setDaemon(true);
-        thread.start();
-    }
-
     @Override
     public void close() {
         closed = true;
-        executor.shutdownNow();
-        disconnect();
+        standard.close();
+        extensions.close();
+    }
+
+    private final class RequestLane {
+
+        private final ExecutorService executor;
+        private final AtomicReference<HttpURLConnection> active = new AtomicReference<>();
+
+        private RequestLane(String threadName) {
+            executor = Executors.newSingleThreadExecutor(action -> {
+                Thread thread = new Thread(action, threadName);
+                thread.setDaemon(true);
+                return thread;
+            });
+        }
+
+        private synchronized JsonObject request(MainConfig config, String path, String token, Object body,
+                                                boolean extensionRequest) throws IOException, InterruptedException {
+            if (closed) {
+                throw new IOException("KraftLink transport is closed");
+            }
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(config.requestTimeoutSeconds);
+            Future<JsonObject> pending;
+            try {
+                pending = executor.submit(() -> send(config, path, token, body, deadline, active, extensionRequest));
+            } catch (RejectedExecutionException error) {
+                throw new IOException("KraftLink transport is closed", error);
+            }
+            try {
+                return pending.get(config.requestTimeoutSeconds + 1L, TimeUnit.SECONDS);
+            } catch (ExecutionException error) {
+                if (error.getCause() instanceof KraftLinkRequestException) {
+                    throw (KraftLinkRequestException) error.getCause();
+                }
+                throw new IOException("The KraftLink response could not be read", error.getCause());
+            } catch (TimeoutException | CancellationException error) {
+                cancel(pending);
+                throw new IOException("The KraftLink response could not be read", error);
+            } catch (InterruptedException error) {
+                cancel(pending);
+                throw error;
+            }
+        }
+
+        private void cancel(Future<?> pending) {
+            pending.cancel(true);
+            disconnect();
+        }
+
+        private void disconnect() {
+            HttpURLConnection connection = active.getAndSet(null);
+            if (connection != null) {
+                Thread thread = new Thread(connection::disconnect, "kraftlink-disconnect");
+                thread.setDaemon(true);
+                thread.start();
+            }
+        }
+
+        private void close() {
+            for (Runnable task : executor.shutdownNow()) {
+                ((Future<?>) task).cancel(true);
+            }
+            disconnect();
+        }
     }
 }

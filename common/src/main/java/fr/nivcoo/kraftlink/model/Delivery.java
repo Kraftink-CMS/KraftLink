@@ -2,6 +2,7 @@ package fr.nivcoo.kraftlink.model;
 
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.Locale;
 import java.util.UUID;
 
 public final class Delivery {
@@ -35,8 +36,23 @@ public final class Delivery {
         return command;
     }
 
+    public String commandLine() {
+        return command.startsWith("/") ? command.substring(1) : command;
+    }
+
+    public String commandRoot() {
+        String line = commandLine();
+        int separator = line.indexOf(' ');
+        return (separator < 0 ? line : line.substring(0, separator)).toLowerCase(Locale.ROOT);
+    }
+
     public String player() {
         return player;
+    }
+
+    public boolean matchesPlayer(UUID targetId, UUID namedPlayerId, String resolvedName) {
+        return (targetId == null || namedPlayerId == null || targetId.equals(namedPlayerId))
+                && (resolvedName == null || player == null || player.equalsIgnoreCase(resolvedName));
     }
 
     public String uuid() {

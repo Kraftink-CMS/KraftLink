@@ -20,7 +20,6 @@ import fr.nivcoo.kraftlink.platform.ServerPlatform;
 import java.lang.management.ManagementFactory;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -59,13 +58,20 @@ public final class HytalePlatform implements ServerPlatform {
 
     @Override
     public CompletionStage<ExecutionResult> execute(Delivery delivery, boolean requireOnline, BooleanSupplier authorized) {
-        PlayerRef player = findPlayer(delivery);
+        UUID uuid = delivery.playerId();
+        String name = delivery.player();
+        Universe universe = Universe.get();
+        PlayerRef player = uuid == null ? findByName(universe, name) : universe.getPlayer(uuid);
         if (requireOnline && player == null) {
+            PlayerRef named = uuid == null ? null : findByName(universe, name);
+            if (!delivery.matchesPlayer(uuid, named == null ? null : named.getUuid(), null)) {
+                return CompletableFuture.completedFuture(ExecutionResult.playerMismatch());
+            }
             return CompletableFuture.completedFuture(ExecutionResult.deferred("The player is offline"));
         }
         UUID worldId = player == null ? null : player.getWorldUuid();
-        World world = player == null ? Universe.get().getDefaultWorld()
-                : worldId == null ? null : Universe.get().getWorld(worldId);
+        World world = player == null ? universe.getDefaultWorld()
+                : worldId == null ? null : universe.getWorld(worldId);
         if (world == null || !world.isAlive()) {
             return CompletableFuture.completedFuture(ExecutionResult.deferred("The target world is unavailable"));
         }
@@ -77,7 +83,13 @@ public final class HytalePlatform implements ServerPlatform {
                         result.complete(ExecutionResult.deferred("The command lease or target world is no longer active"));
                         return;
                     }
-                    PlayerRef current = findPlayer(delivery);
+                    PlayerRef named = findByName(universe, name);
+                    PlayerRef current = uuid == null ? named : universe.getPlayer(uuid);
+                    if (!delivery.matchesPlayer(uuid, named == null ? null : named.getUuid(),
+                            current == null ? null : current.getUsername())) {
+                        result.complete(ExecutionResult.playerMismatch());
+                        return;
+                    }
                     if (requireOnline && (current == null || !current.isValid())) {
                         result.complete(ExecutionResult.deferred("The player is no longer online"));
                         return;
@@ -86,12 +98,7 @@ public final class HytalePlatform implements ServerPlatform {
                         result.complete(ExecutionResult.deferred("The player is changing worlds"));
                         return;
                     }
-                    if (current != null && delivery.player() != null
-                            && !current.getUsername().equalsIgnoreCase(delivery.player())) {
-                        result.complete(new ExecutionResult(ExecutionResult.State.FAILED, "Player name does not match the UUID"));
-                        return;
-                    }
-                    dispatch(delivery.command().replaceFirst("^/", ""), authorized).whenComplete((execution, error) -> {
+                    dispatch(delivery, authorized).whenComplete((execution, error) -> {
                         if (error != null) result.completeExceptionally(error);
                         else result.complete(execution);
                     });
@@ -109,15 +116,15 @@ public final class HytalePlatform implements ServerPlatform {
         return result;
     }
 
-    private CompletionStage<ExecutionResult> dispatch(String command, BooleanSupplier authorized) {
-        String root = command.split("\\s+", 2)[0].toLowerCase(Locale.ROOT);
-        AbstractCommand registered = CommandManager.get().resolveCommand(root);
+    private CompletionStage<ExecutionResult> dispatch(Delivery delivery, BooleanSupplier authorized) {
+        AbstractCommand registered = CommandManager.get().resolveCommand(delivery.commandRoot());
         if (registered == null) {
             return CompletableFuture.completedFuture(
                     new ExecutionResult(ExecutionResult.State.FAILED, "The command is not registered on this server"));
         }
         ParseResult parsed = new ParseResult();
         ParserContext context;
+        String command = delivery.commandLine();
         try {
             List<String> arguments = Tokenizer.parseArguments(command, parsed);
             if (parsed.failed()) return rejected(parsed);
@@ -167,10 +174,8 @@ public final class HytalePlatform implements ServerPlatform {
         return future;
     }
 
-    private PlayerRef findPlayer(Delivery delivery) {
-        if (delivery.playerId() != null) return Universe.get().getPlayer(delivery.playerId());
-        if (delivery.player() == null) return null;
-        return Universe.get().getPlayerByUsername(delivery.player(), NameMatching.EXACT_IGNORE_CASE);
+    private PlayerRef findByName(Universe universe, String name) {
+        return name == null ? null : universe.getPlayerByUsername(name, NameMatching.EXACT_IGNORE_CASE);
     }
 
     private static final class WorldSample {

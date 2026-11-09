@@ -1,6 +1,7 @@
 package fr.nivcoo.kraftlink.command;
 
 import fr.nivcoo.kraftlink.config.MainConfig;
+import fr.nivcoo.kraftlink.model.BedrockIdentity;
 import fr.nivcoo.kraftlink.service.DeliveryEngine;
 
 import java.io.IOException;
@@ -10,6 +11,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 public final class ConnectionCommandHandler {
@@ -73,10 +75,55 @@ public final class ConnectionCommandHandler {
     }
 
     public List<String> complete(String[] args) {
+        return complete(args, true, false);
+    }
+
+    public void link(String label, String[] args, boolean permitted, Supplier<BedrockIdentity> player,
+                     Consumer<String> reply) {
+        if (!engine.running()) {
+            return;
+        }
+        MainConfig config = engine.config();
+        MainConfig.Messages messages = config.messages;
+        if (!config.bedrockLinkEnabled) {
+            reply.accept(messages.linkDisabled);
+            return;
+        }
+        if (player == null) {
+            reply.accept(messages.linkPlayerOnly);
+            return;
+        }
+        if (!permitted) {
+            reply.accept(messages.permissionDenied);
+            return;
+        }
+        if (args.length != 2 || !args[1].matches("[A-Za-z2-7]{10}")) {
+            reply.accept(messages.linkUsage.replace("{label}", label));
+            return;
+        }
+        BedrockIdentity identity = player.get();
+        if (identity == null) {
+            reply.accept(messages.linkFloodgateRequired);
+            return;
+        }
+        if (identity.linkedToJava()) {
+            reply.accept(messages.linkJavaRequired);
+            return;
+        }
+
+        engine.verifyBedrock(args[1].toUpperCase(Locale.ROOT), identity, reply);
+    }
+
+    public List<String> complete(String[] args, boolean admin, boolean linkPermitted) {
+        boolean link = linkPermitted && engine.config().bedrockLinkEnabled;
         List<String> values;
-        if (args.length == 1) {
+        if (args.length == 1 && admin && link) {
+            values = Arrays.asList("status", "reload", "uncertain", "resolve", "link");
+        } else if (args.length == 1 && admin) {
             values = Arrays.asList("status", "reload", "uncertain", "resolve");
-        } else if (args.length == 3 && args[0].equalsIgnoreCase("resolve")) {
+        } else if (args.length == 1 && link) {
+            values = Collections.singletonList("link");
+        } else if (args.length == 3 && admin && args[0].equalsIgnoreCase("resolve")) {
             values = Arrays.asList("delivered", "retry");
         } else {
             return Collections.emptyList();

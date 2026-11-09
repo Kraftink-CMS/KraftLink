@@ -1,8 +1,12 @@
 package fr.nivcoo.kraftlink.bukkit.platform;
 
+import fr.nivcoo.kraftlink.config.MainConfig;
+import fr.nivcoo.kraftlink.model.InGameSignInPlayer;
+import fr.nivcoo.kraftlink.model.InGameSignInPrompt;
 import fr.nivcoo.kraftlink.model.Heartbeat;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -15,6 +19,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 public final class PaperPlatform extends BukkitPlatform {
@@ -28,6 +34,52 @@ public final class PaperPlatform extends BukkitPlatform {
         this.regions = regions;
         this.metrics = metrics;
         this.folia = folia;
+    }
+
+    @Override
+    public CompletionStage<List<InGameSignInPlayer>> inGameSignInPlayers() {
+        if (!regions) {
+            return super.inGameSignInPlayers();
+        }
+        return onServerThread(() -> {
+            List<CompletableFuture<InGameSignInPlayer>> players = new ArrayList<>(Bukkit.getOnlinePlayers()).stream()
+                    .map(player -> onPlayerThread(player, () -> inGameSignInIdentity(player)))
+                    .collect(Collectors.toList());
+            return CompletableFuture.allOf(players.toArray(new CompletableFuture<?>[0]))
+                    .thenApply(ignored -> players.stream().map(CompletableFuture::join)
+                            .filter(Objects::nonNull).collect(Collectors.toList()));
+        }).thenCompose(value -> value);
+    }
+
+    @Override
+    protected <T> CompletableFuture<T> onPlayerThread(Player player, Supplier<T> action) {
+        return regions ? RegionTasks.run(plugin, player, action) : super.onPlayerThread(player, action);
+    }
+
+    @Override
+    protected boolean standaloneOnlineMode() {
+        if (!super.standaloneOnlineMode()) {
+            return false;
+        }
+        YamlConfiguration config = Bukkit.spigot().getPaperConfig();
+        return config != null && !config.getBoolean("proxies.velocity.enabled")
+                && !config.getBoolean("settings.velocity-support.enabled");
+    }
+
+    @Override
+    protected boolean showJavaSignIn(Player player, InGameSignInPrompt prompt, MainConfig.SignInMessages messages,
+                                     Consumer<String> respond) {
+        ClassLoader serverLoader = Bukkit.getServer().getClass().getClassLoader();
+        if (serverLoader.getResource("io/papermc/paper/dialog/Dialog.class") != null) {
+            PaperSignInDialog.show(player, prompt, messages);
+            return true;
+        }
+        return super.showJavaSignIn(player, prompt, messages, respond);
+    }
+
+    @Override
+    protected boolean supportsSignInInventory() {
+        return !folia;
     }
 
     @Override
@@ -97,14 +149,24 @@ public final class PaperPlatform extends BukkitPlatform {
             }, null, 1);
         }
 
-        private static CompletableFuture<PlayerSample> sample(JavaPlugin plugin, Player player) {
-            CompletableFuture<PlayerSample> sample = new CompletableFuture<>();
+        private static <T> CompletableFuture<T> run(JavaPlugin plugin, Player player, Supplier<T> action) {
+            CompletableFuture<T> result = new CompletableFuture<>();
             boolean accepted = player.getScheduler().execute(plugin, () -> {
+                try {
+                    result.complete(action.get());
+                } catch (RuntimeException error) {
+                    result.completeExceptionally(error);
+                }
+            }, () -> result.complete(null), 1);
+            if (!accepted) result.complete(null);
+            return result;
+        }
+
+        private static CompletableFuture<PlayerSample> sample(JavaPlugin plugin, Player player) {
+            return run(plugin, player, () -> {
                 Heartbeat.PlayerIdentity identity = new Heartbeat.PlayerIdentity(player.getUniqueId().toString(), player.getName());
-                sample.complete(new PlayerSample(identity, player.getWorld().getName()));
-            }, () -> sample.complete(null), 1);
-            if (!accepted) sample.complete(null);
-            return sample;
+                return new PlayerSample(identity, player.getWorld().getName());
+            });
         }
     }
 

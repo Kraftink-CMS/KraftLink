@@ -4,11 +4,14 @@ import java.util.List;
 
 public final class Heartbeat {
 
+    public static final int MAX_PLAYER_SAMPLE = 2000;
+
     private final int protocol;
     private final String game;
     private final String software;
     private final String version;
     private final List<PlayerIdentity> players;
+    private final Integer playersOnline;
     private final int maxPlayers;
     private final long uptimeSeconds;
     private final List<Double> tps;
@@ -17,11 +20,18 @@ public final class Heartbeat {
 
     public Heartbeat(int protocol, String game, String software, String version, List<PlayerIdentity> players,
                      int maxPlayers, long uptimeSeconds, List<Double> tps, Memory memory, List<WorldStatus> worlds) {
+        this(protocol, game, software, version, players, maxPlayers, uptimeSeconds, tps, memory, worlds, null);
+    }
+
+    private Heartbeat(int protocol, String game, String software, String version, List<PlayerIdentity> players,
+                      int maxPlayers, long uptimeSeconds, List<Double> tps, Memory memory, List<WorldStatus> worlds,
+                      Integer playersOnline) {
         this.protocol = protocol;
         this.game = game;
         this.software = software;
         this.version = version;
         this.players = players;
+        this.playersOnline = playersOnline;
         this.maxPlayers = maxPlayers;
         this.uptimeSeconds = uptimeSeconds;
         this.tps = tps;
@@ -47,6 +57,14 @@ public final class Heartbeat {
 
     public List<PlayerIdentity> players() {
         return players;
+    }
+
+    public Heartbeat withPlayerSample(List<PlayerIdentity> sample) {
+        if (sample == players) {
+            return this;
+        }
+        return new Heartbeat(protocol, game, software, version, sample, maxPlayers, uptimeSeconds, tps, memory, worlds,
+                playersOnline == null ? players.size() : playersOnline);
     }
 
     public int maxPlayers() {

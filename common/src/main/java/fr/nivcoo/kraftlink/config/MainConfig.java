@@ -4,6 +4,7 @@ import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParseException;
+import com.google.gson.ToNumberPolicy;
 
 import java.io.IOException;
 import java.net.URI;
@@ -14,21 +15,31 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public final class MainConfig {
 
+    public static final String DEFAULT_HEARTBEAT_PATH = "/api/link/heartbeat";
+    public static final String DEFAULT_CLAIM_PATH = "/api/link/commands/claim";
+    public static final String DEFAULT_ACK_PATH = "/api/link/commands/{id}/ack";
+
     public static final Gson JSON = new GsonBuilder()
             .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+            .setObjectToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
             .disableHtmlEscaping()
             .create();
 
     public String cmsUrl = "";
     public String token = "";
-    public String heartbeatPath = "/api/link/heartbeat";
+    public boolean bedrockLinkEnabled = false;
+    public String heartbeatPath = DEFAULT_HEARTBEAT_PATH;
     public int heartbeatSeconds = 30;
     public int pollSeconds = 5;
+    public int signInPollSeconds = 3;
+    public Map<String, Integer> operationPollSeconds = new LinkedHashMap<>();
     public int requestTimeoutSeconds = 15;
     public int executionTimeoutSeconds = 20;
     public List<String> allowedCommandRoots = new ArrayList<>();
@@ -74,7 +85,8 @@ public final class MainConfig {
     }
 
     private void validate() {
-        if (cmsUrl == null || token == null || channels == null || allowedCommandRoots == null || messages == null) {
+        if (cmsUrl == null || token == null || channels == null || allowedCommandRoots == null || messages == null
+                || operationPollSeconds == null) {
             throw new IllegalArgumentException("Missing KraftLink configuration section");
         }
         if (!blank(cmsUrl)) {
@@ -89,9 +101,15 @@ public final class MainConfig {
         validateToken(token);
         validatePath(heartbeatPath);
         if (heartbeatSeconds < 10 || heartbeatSeconds > 3600 || pollSeconds < 1 || pollSeconds > 300
+                || signInPollSeconds < 1 || signInPollSeconds > 30
                 || requestTimeoutSeconds < 1 || requestTimeoutSeconds > 60
                 || executionTimeoutSeconds < 1 || executionTimeoutSeconds > 60) {
             throw new IllegalArgumentException("Invalid KraftLink interval or timeout");
+        }
+        if (operationPollSeconds.size() > 64 || operationPollSeconds.entrySet().stream().anyMatch(entry ->
+                !validOperationName(entry.getKey()) || entry.getValue() == null
+                        || entry.getValue() < 1 || entry.getValue() > 300)) {
+            throw new IllegalArgumentException("Invalid KraftLink operation interval");
         }
 
         Set<String> channelIds = new HashSet<>();
@@ -133,6 +151,11 @@ public final class MainConfig {
         return value.codePoints().allMatch(Character::isWhitespace);
     }
 
+    public static boolean validOperationName(String name) {
+        return name != null && name.length() <= 64
+                && name.matches("[a-z][a-z0-9_-]{0,31}(?:\\.[a-z][a-z0-9_-]{0,31})+");
+    }
+
     private static void validatePath(String path) {
         if (path == null || !path.startsWith("/") || path.startsWith("//")
                 || path.contains("..") || path.contains("?") || path.contains("#")) {
@@ -145,8 +168,8 @@ public final class MainConfig {
         public String id = "cms";
         public boolean enabled = true;
         public String token = "";
-        public String claimPath = "/api/link/commands/claim";
-        public String ackPath = "/api/link/commands/{id}/ack";
+        public String claimPath = DEFAULT_CLAIM_PATH;
+        public String ackPath = DEFAULT_ACK_PATH;
         public boolean requirePlayerOnline = false;
     }
 
@@ -161,12 +184,44 @@ public final class MainConfig {
         public String notUncertain = "KraftLink delivery is not awaiting manual review.";
         public String journalFailed = "KraftLink journal update failed.";
         public String usage = "/{label} status|reload|uncertain|resolve <id> delivered|retry";
+        public String linkUsage = "/{label} link <code from the website>";
+        public String linkDisabled = "Bedrock account linking is disabled on this server.";
+        public String linkPlayerOnly = "Run this command from your Bedrock account in game.";
+        public String linkFloodgateRequired = "Join this server with your authenticated Bedrock account to link it.";
+        public String linkJavaRequired = "Your Bedrock account is already linked to Java on this server. Choose Minecraft Java (Microsoft) on the website.";
+        public String linkUnavailable = "Bedrock verification is unavailable here. Use the server shown on the website or try again later.";
+        public String linkRejected = "This code is invalid, expired or already used. Check the verification page.";
+        public String linkAccepted = "Bedrock account verified. Return to the website to finish linking.";
+        public SignInMessages inGameSignIn = new SignInMessages();
 
         private void validate() {
             if (permissionDenied == null || status == null || uncertainEntry == null || reloaded == null
                     || reloadRejected == null || resolved == null || notUncertain == null
-                    || journalFailed == null || usage == null) {
+                    || journalFailed == null || usage == null || linkUsage == null || linkDisabled == null || linkPlayerOnly == null
+                    || linkFloodgateRequired == null || linkJavaRequired == null || linkUnavailable == null || linkRejected == null
+                    || linkAccepted == null || inGameSignIn == null) {
                 throw new IllegalArgumentException("Missing KraftLink command message");
+            }
+            inGameSignIn.validate();
+        }
+    }
+
+    public static final class SignInMessages {
+
+        public String title = "In-game sign-in";
+        public String instructions = "Choose the number shown on the website.";
+        public String reject = "This isn’t me";
+        public String mute = "Mute for 24 hours";
+        public String approved = "Sign-in approved. Return to the website.";
+        public String rejected = "Sign-in request rejected.";
+        public String muted = "Sign-in notifications muted for 24 hours.";
+        public String expired = "This sign-in request is no longer active.";
+        public String unavailable = "Return to the website to check or resend your sign-in request.";
+
+        private void validate() {
+            if (title == null || instructions == null || reject == null || mute == null || approved == null
+                    || rejected == null || muted == null || expired == null || unavailable == null) {
+                throw new IllegalArgumentException("Missing KraftLink in-game sign-in messages");
             }
         }
     }
