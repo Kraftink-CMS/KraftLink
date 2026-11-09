@@ -8,7 +8,7 @@
     <parent>
         <groupId>fr.nivcoo.kraftink</groupId>
         <artifactId>KraftLink-parent</artifactId>
-        <version>1.5.0</version>
+        <version>1.5.1-dev</version>
     </parent>
     <artifactId>KraftLink-common</artifactId>
     <repositories>
