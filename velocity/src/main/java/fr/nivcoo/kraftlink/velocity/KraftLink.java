@@ -73,7 +73,7 @@ public final class KraftLink implements KraftLinkProvider {
 
     @Subscribe(priority = -100)
     public void registerLinkShortcut(ProxyInitializeEvent event) {
-        if (!running() || !engine.config().bedrockLinkEnabled) return;
+        if (!running()) return;
         CommandManager manager = proxy.getCommandManager();
         if (manager.hasCommand(LINK_SHORTCUT)) {
             logger.warning("The /link command is already registered. Use /kraftlink link to verify Bedrock accounts.");

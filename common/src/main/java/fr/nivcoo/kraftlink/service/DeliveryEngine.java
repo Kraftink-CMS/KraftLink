@@ -44,6 +44,7 @@ import java.util.stream.Collectors;
 public final class DeliveryEngine implements AutoCloseable {
 
     private static final int MAX_EXTENSION_OPERATIONS = 13;
+    private static final long BEDROCK_RETRY_DELAY = TimeUnit.SECONDS.toNanos(5);
 
     private final ServerPlatform platform;
     private final CommandJournal journal;
@@ -65,6 +66,7 @@ public final class DeliveryEngine implements AutoCloseable {
     });
     private final Map<String, RegisteredOperation> extensionOperations = new ConcurrentHashMap<>();
     private final Map<String, Long> operationWarnings = new HashMap<>();
+    private final Map<String, Long> bedrockPlayerRetryAt = new HashMap<>();
     private final AtomicBoolean running = new AtomicBoolean(true);
     private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean verifyingBedrock = new AtomicBoolean();
@@ -75,6 +77,8 @@ public final class DeliveryEngine implements AutoCloseable {
     private volatile MainConfig authMeRegistrationConfig;
     private volatile String status = "waiting";
     private volatile long connectedServerId;
+    private MainConfig bedrockRetryConfig;
+    private Long bedrockServerRetryAt;
     private MainConfig scheduledConfig;
     private long nextHeartbeat;
     private long nextPoll;
@@ -230,10 +234,6 @@ public final class DeliveryEngine implements AutoCloseable {
 
     public void verifyBedrock(String code, BedrockIdentity identity, Consumer<String> reply) {
         MainConfig current = config;
-        if (!current.bedrockLinkEnabled) {
-            reply.accept(current.messages.linkDisabled);
-            return;
-        }
         if (!running.get() || MainConfig.blank(current.cmsUrl) || MainConfig.blank(current.token)
                 || !verifyingBedrock.compareAndSet(false, true)) {
             reply.accept(current.messages.linkUnavailable);
@@ -249,10 +249,7 @@ public final class DeliveryEngine implements AutoCloseable {
                         reply.accept(config.messages.linkUnavailable);
                         return;
                     }
-                    boolean accepted = transport.verifyBedrock(current, code, identity);
-                    reply.accept(accepted ? current.messages.linkAccepted : current.messages.linkRejected);
-                } catch (IOException error) {
-                    reply.accept(current.messages.linkUnavailable);
+                    reply.accept(bedrockResult(current, code, identity));
                 } catch (InterruptedException error) {
                     Thread.currentThread().interrupt();
                 } finally {
@@ -263,6 +260,43 @@ public final class DeliveryEngine implements AutoCloseable {
             verifyingBedrock.set(false);
             reply.accept(current.messages.linkUnavailable);
         }
+    }
+
+    private String bedrockResult(MainConfig current, String code, BedrockIdentity identity) throws InterruptedException {
+        if (bedrockRetryConfig != current) {
+            bedrockRetryConfig = current;
+            bedrockServerRetryAt = null;
+            bedrockPlayerRetryAt.clear();
+        }
+        long now = System.nanoTime();
+        if (bedrockServerRetryAt != null && now - bedrockServerRetryAt < 0) {
+            return current.messages.linkUnavailable;
+        }
+        bedrockPlayerRetryAt.values().removeIf(retryAt -> now - retryAt >= 0);
+        if (bedrockPlayerRetryAt.containsKey(identity.xuid())) {
+            return current.messages.linkRetry;
+        }
+        String failureMessage;
+        try {
+            if (transport.verifyBedrock(current, code, identity)) {
+                return current.messages.linkAccepted;
+            }
+            failureMessage = current.messages.linkRejected;
+        } catch (KraftLinkRequestException error) {
+            if (error.status() != 422) {
+                return bedrockUnavailable(current);
+            }
+            failureMessage = current.messages.linkUnavailable;
+        } catch (IOException error) {
+            return bedrockUnavailable(current);
+        }
+        bedrockPlayerRetryAt.put(identity.xuid(), System.nanoTime() + BEDROCK_RETRY_DELAY);
+        return failureMessage;
+    }
+
+    private String bedrockUnavailable(MainConfig current) {
+        bedrockServerRetryAt = System.nanoTime() + BEDROCK_RETRY_DELAY;
+        return current.messages.linkUnavailable;
     }
 
     private void tick() {

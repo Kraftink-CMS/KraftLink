@@ -93,12 +93,7 @@ public final class ConnectionCommandHandler {
         if (!engine.running()) {
             return;
         }
-        MainConfig config = engine.config();
-        MainConfig.Messages messages = config.messages;
-        if (!config.bedrockLinkEnabled) {
-            reply.accept(messages.linkDisabled);
-            return;
-        }
+        MainConfig.Messages messages = engine.config().messages;
         if (player == null) {
             reply.accept(messages.linkPlayerOnly);
             return;
@@ -126,13 +121,12 @@ public final class ConnectionCommandHandler {
     }
 
     public List<String> complete(String[] args, boolean admin, boolean linkPermitted) {
-        boolean link = linkPermitted && engine.config().bedrockLinkEnabled;
         List<String> values;
-        if (args.length == 1 && admin && link) {
+        if (args.length == 1 && admin && linkPermitted) {
             values = Arrays.asList("status", "reload", "uncertain", "resolve", "link");
         } else if (args.length == 1 && admin) {
             values = Arrays.asList("status", "reload", "uncertain", "resolve");
-        } else if (args.length == 1 && link) {
+        } else if (args.length == 1 && linkPermitted) {
             values = Collections.singletonList("link");
         } else if (args.length == 3 && admin && args[0].equalsIgnoreCase("resolve")) {
             values = Arrays.asList("delivered", "retry");
