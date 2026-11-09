@@ -20,7 +20,11 @@ platform support. Stop the server and install one KraftLink JAR per instance.
 | Sponge                          | `KraftLink-Sponge-VERSION.jar`   | `mods/plugins/`     |
 | Nukkit                          | `KraftLink-Nukkit-VERSION.jar`   | `plugins/`          |
 
-See the [installation guide](https://kraftink.com/en/documentation/kraftlink) for the game, loader and Java requirements.
+The Bukkit variant supports Minecraft from 1.8.8 and targets Java 8. The Hytale variant is built against server 0.7.4.
+Fabric, Forge and NeoForge target Minecraft Java 26.1.2 and require Java 25. Fabric also requires Fabric API. Sponge
+targets SpongeAPI 17 on Minecraft Java 1.21.10. The Nukkit variant targets Cloudburst Nukkit API 1.1 and connects to a
+Minecraft Bedrock server. See the [installation guide](https://kraftink.com/en/documentation/kraftlink) for platform
+requirements.
 
 On SpongeVanilla and SpongeForge, put either JAR in `mods/plugins/`. Use the dedicated Sponge JAR on SpongeNeo so that
 the NeoForge loader discovers KraftLink as a Sponge plugin.
@@ -34,7 +38,7 @@ Hytale manifest. Use the dedicated Nukkit JAR to avoid that warning.
 
 ## Build from source
 
-Build with Maven, the Gradle wrapper and the JDK configured in the [build action](.github/actions/build/action.yml).
+Build with JDK 25, Maven and the Gradle wrapper.
 
 ```shell
 mvn clean package
