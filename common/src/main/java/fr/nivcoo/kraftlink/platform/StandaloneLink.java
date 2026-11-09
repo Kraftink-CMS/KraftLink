@@ -67,14 +67,18 @@ public final class StandaloneLink implements AutoCloseable {
         handler.execute("kraftlink", arguments.isEmpty() ? new String[0] : arguments.split("\\s+"), allowed, reply);
     }
 
-    public void link(String label, String[] arguments, boolean allowed, Supplier<BedrockIdentity> player,
+    public void link(String label, String[] arguments, boolean shortcut, boolean allowed, Supplier<BedrockIdentity> player,
                      Consumer<String> reply) {
         ConnectionCommandHandler handler = commands.get();
         if (handler == null) {
             reply.accept("KraftLink is unavailable.");
             return;
         }
-        handler.link(label, arguments, allowed, player, reply);
+        if (shortcut) {
+            handler.linkShortcut(label, arguments, allowed, player, reply);
+        } else {
+            handler.link(label, arguments, allowed, player, reply);
+        }
     }
 
     @Override
