@@ -185,6 +185,7 @@ public final class MainConfig {
         public String journalFailed = "KraftLink journal update failed.";
         public String usage = "/{label} status|reload|uncertain|resolve <id> delivered|retry";
         public String linkUsage = "/{label} link <code from the website>";
+        public String linkShortcutUsage = "/{label} <code from the website>";
         public String linkDisabled = "Bedrock account linking is disabled on this server.";
         public String linkPlayerOnly = "Run this command from your Bedrock account in game.";
         public String linkFloodgateRequired = "Join this server with your authenticated Bedrock account to link it.";
@@ -197,7 +198,8 @@ public final class MainConfig {
         private void validate() {
             if (permissionDenied == null || status == null || uncertainEntry == null || reloaded == null
                     || reloadRejected == null || resolved == null || notUncertain == null
-                    || journalFailed == null || usage == null || linkUsage == null || linkDisabled == null || linkPlayerOnly == null
+                    || journalFailed == null || usage == null || linkUsage == null || linkShortcutUsage == null
+                    || linkDisabled == null || linkPlayerOnly == null
                     || linkFloodgateRequired == null || linkJavaRequired == null || linkUnavailable == null || linkRejected == null
                     || linkAccepted == null || inGameSignIn == null) {
                 throw new IllegalArgumentException("Missing KraftLink command message");

@@ -13,6 +13,8 @@ import net.kyori.adventure.text.Component;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public final class KraftLinkCommand implements SimpleCommand {
 
@@ -31,9 +33,7 @@ public final class KraftLinkCommand implements SimpleCommand {
         CommandSource source = invocation.source();
         String[] args = invocation.arguments();
         if (args.length > 0 && args[0].equalsIgnoreCase("link")) {
-            handler.link(invocation.alias(), args, canLink(source),
-                    source instanceof Player ? () -> bedrock((Player) source) : null,
-                    message -> send(source, message));
+            link(invocation, false);
         } else if (args.length > 0 && args[0].equalsIgnoreCase("signin")) {
             if (args.length == 3 && source instanceof Player) {
                 plugin.engine().respondToInGameSignIn(platform.inGameSignInIdentity((Player) source), args[1], args[2],
@@ -42,6 +42,21 @@ public final class KraftLinkCommand implements SimpleCommand {
         } else {
             handler.execute(invocation.alias(), args, source.hasPermission("kraftlink.admin"),
                     message -> send(source, message));
+        }
+    }
+
+    public SimpleCommand linkShortcut() {
+        return new LinkShortcut();
+    }
+
+    private void link(Invocation invocation, boolean shortcut) {
+        CommandSource source = invocation.source();
+        Supplier<BedrockIdentity> player = source instanceof Player ? () -> bedrock((Player) source) : null;
+        Consumer<String> reply = message -> send(source, message);
+        if (shortcut) {
+            handler.linkShortcut(invocation.alias(), invocation.arguments(), canLink(source), player, reply);
+        } else {
+            handler.link(invocation.alias(), invocation.arguments(), canLink(source), player, reply);
         }
     }
 
@@ -72,5 +87,22 @@ public final class KraftLinkCommand implements SimpleCommand {
             if (!plugin.running() || source instanceof Player && !((Player) source).isActive()) return;
             source.sendMessage(Component.text(message));
         }).schedule();
+    }
+
+    private final class LinkShortcut implements SimpleCommand {
+
+        @Override
+        public void execute(Invocation invocation) {
+            link(invocation, true);
+        }
+
+        @Override
+        public boolean hasPermission(Invocation invocation) {
+            CommandSource source = invocation.source();
+            if (!plugin.running() || !plugin.engine().config().bedrockLinkEnabled
+                    || !(source instanceof Player) || !canLink(source) || !hasFloodgate()) return false;
+            Player player = (Player) source;
+            return player.isActive() && FloodgateProfiles.isPlayer(player.getUniqueId());
+        }
     }
 }

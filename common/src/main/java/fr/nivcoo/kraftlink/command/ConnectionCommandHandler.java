@@ -80,6 +80,16 @@ public final class ConnectionCommandHandler {
 
     public void link(String label, String[] args, boolean permitted, Supplier<BedrockIdentity> player,
                      Consumer<String> reply) {
+        link(label, args, 1, permitted, player, reply);
+    }
+
+    public void linkShortcut(String label, String[] args, boolean permitted, Supplier<BedrockIdentity> player,
+                             Consumer<String> reply) {
+        link(label, args, 0, permitted, player, reply);
+    }
+
+    private void link(String label, String[] args, int codeIndex, boolean permitted, Supplier<BedrockIdentity> player,
+                      Consumer<String> reply) {
         if (!engine.running()) {
             return;
         }
@@ -97,8 +107,9 @@ public final class ConnectionCommandHandler {
             reply.accept(messages.permissionDenied);
             return;
         }
-        if (args.length != 2 || !args[1].matches("[A-Za-z2-7]{10}")) {
-            reply.accept(messages.linkUsage.replace("{label}", label));
+        if (args.length != codeIndex + 1 || !args[codeIndex].matches("[A-Za-z2-7]{10}")) {
+            String usage = codeIndex == 0 ? messages.linkShortcutUsage : messages.linkUsage;
+            reply.accept(usage.replace("{label}", label));
             return;
         }
         BedrockIdentity identity = player.get();
@@ -111,7 +122,7 @@ public final class ConnectionCommandHandler {
             return;
         }
 
-        engine.verifyBedrock(args[1].toUpperCase(Locale.ROOT), identity, reply);
+        engine.verifyBedrock(args[codeIndex].toUpperCase(Locale.ROOT), identity, reply);
     }
 
     public List<String> complete(String[] args, boolean admin, boolean linkPermitted) {

@@ -1,6 +1,7 @@
 package fr.nivcoo.kraftlink.velocity;
 
 import com.google.inject.Inject;
+import com.velocitypowered.api.command.CommandManager;
 import com.velocitypowered.api.command.CommandMeta;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
@@ -27,12 +28,16 @@ import java.util.logging.Logger;
 
 public final class KraftLink implements KraftLinkProvider {
 
+    private static final String LINK_SHORTCUT = "link";
+
     private final ProxyServer proxy;
     private final Path dataDirectory;
     private final Logger logger = Logger.getLogger(KraftLink.class.getName());
     private volatile KraftLinkApi api;
     private DeliveryEngine engine;
     private CommandMeta commandMeta;
+    private CommandMeta linkShortcutMeta;
+    private KraftLinkCommand commands;
 
     @Inject
     public KraftLink(ProxyServer proxy, @DataDirectory Path dataDirectory) {
@@ -49,18 +54,34 @@ public final class KraftLink implements KraftLinkProvider {
             engine = new DeliveryEngine(config, platform,
                     new CommandJournal(dataDirectory.resolve("commands.jsonl")), new HttpLinkTransport(instance), logger, instance);
             CommandMeta meta = proxy.getCommandManager().metaBuilder("kraftlink").plugin(this).build();
-            proxy.getCommandManager().register(meta, new KraftLinkCommand(this, platform));
+            commands = new KraftLinkCommand(this, platform);
+            proxy.getCommandManager().register(meta, commands);
             commandMeta = meta;
             engine.start();
             if (!config.enabled()) logger.info("KraftLink is waiting for cms_url and token in config.json.");
             if (config.allowedCommandRoots.isEmpty()) {
                 logger.info("No proxy commands are authorized. Configure allowed_command_roots before enabling deliveries.");
             }
-            api = engine.api();
-        } catch (IOException | IllegalArgumentException error) {
+            KraftLinkApi startedApi = engine.api();
+            KraftLinkProvider.register(startedApi);
+            api = startedApi;
+        } catch (IOException | IllegalArgumentException | IllegalStateException error) {
             logger.log(Level.SEVERE, "KraftLink could not start", error);
             close();
         }
+    }
+
+    @Subscribe(priority = -100)
+    public void registerLinkShortcut(ProxyInitializeEvent event) {
+        if (!running() || !engine.config().bedrockLinkEnabled) return;
+        CommandManager manager = proxy.getCommandManager();
+        if (manager.hasCommand(LINK_SHORTCUT)) {
+            logger.warning("The /link command is already registered. Use /kraftlink link to verify Bedrock accounts.");
+            return;
+        }
+        CommandMeta meta = manager.metaBuilder(LINK_SHORTCUT).plugin(this).build();
+        manager.register(meta, commands.linkShortcut());
+        linkShortcutMeta = meta;
     }
 
     @Subscribe(priority = -100)
@@ -69,6 +90,7 @@ public final class KraftLink implements KraftLinkProvider {
     }
 
     private void close() {
+        KraftLinkProvider.unregister(api);
         api = null;
         if (engine != null) {
             try {
@@ -80,6 +102,11 @@ public final class KraftLink implements KraftLinkProvider {
         if (commandMeta != null) {
             proxy.getCommandManager().unregister(commandMeta);
             commandMeta = null;
+        }
+        if (linkShortcutMeta != null) {
+            CommandManager manager = proxy.getCommandManager();
+            if (manager.getCommandMeta(LINK_SHORTCUT) == linkShortcutMeta) manager.unregister(linkShortcutMeta);
+            linkShortcutMeta = null;
         }
         proxy.getScheduler().tasksByPlugin(this).forEach(ScheduledTask::cancel);
     }
