@@ -13,11 +13,8 @@
     <artifactId>KraftLink-common</artifactId>
     <repositories>
         <repository>
-            <id>opencollab-snapshot</id>
-            <url>https://repo.opencollab.dev/maven-snapshots/</url>
-            <releases>
-                <enabled>false</enabled>
-            </releases>
+            <id>opencollab</id>
+            <url>https://repo.opencollab.dev/main/</url>
         </repository>
     </repositories>
     <dependencies>
