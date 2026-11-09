@@ -36,8 +36,12 @@ runs:
         [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-dev)?$ ]]
         [[ "$OUTPUT_DIRECTORY" == /* ]]
         mvn -B -ntp clean package "-Dproject.build.outputTimestamp=$(git show -s --format=%cI HEAD)"
+        bash mods/gradlew -p mods --no-daemon assemble
         mkdir -- "$OUTPUT_DIRECTORY"
-        for jar in KraftLink.jar "KraftLink-Bukkit-$VERSION.jar" "KraftLink-Velocity-$VERSION.jar" "KraftLink-Hytale-$VERSION.jar"; do
+        [[ -f target/KraftLink.jar && ! -L target/KraftLink.jar ]]
+        cp -- target/KraftLink.jar "$OUTPUT_DIRECTORY/"
+        for platform in Bukkit Velocity Hytale Sponge Fabric Forge NeoForge Nukkit; do
+          jar="KraftLink-$platform-$VERSION.jar"
           [[ -f "target/$jar" && ! -L "target/$jar" ]]
           cp -- "target/$jar" "$OUTPUT_DIRECTORY/"
         done

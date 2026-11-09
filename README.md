@@ -6,15 +6,20 @@ KraftLink connects your game server or proxy to KraftInk. It reports server stat
 
 ## Install KraftLink
 
-Download `KraftLink.jar` or the variant for your platform. Stop the server and install one KraftLink JAR per instance.
+Download the variant for your platform. `KraftLink.jar` covers Bukkit, Velocity and Hytale. Stop the server and install one KraftLink JAR per instance.
 
 | Platform                        | Dedicated JAR                    | Installation folder |
 | ------------------------------- | -------------------------------- | ------------------- |
 | Bukkit, Spigot, Paper and Folia | `KraftLink-Bukkit-VERSION.jar`   | `plugins/`          |
 | Velocity                        | `KraftLink-Velocity-VERSION.jar` | `plugins/`          |
 | Hytale                          | `KraftLink-Hytale-VERSION.jar`   | `mods/`             |
+| Fabric                          | `KraftLink-Fabric-VERSION.jar`   | `mods/`             |
+| Forge                           | `KraftLink-Forge-VERSION.jar`    | `mods/`             |
+| NeoForge                        | `KraftLink-NeoForge-VERSION.jar` | `mods/`             |
+| Sponge                          | `KraftLink-Sponge-VERSION.jar`   | `mods/`             |
+| Nukkit                          | `KraftLink-Nukkit-VERSION.jar`   | `plugins/`          |
 
-The Bukkit variant supports Minecraft from 1.8.8 and targets Java 8. The Hytale variant is built against server 0.7.4. Use the Java version required by your server or proxy.
+The Bukkit variant supports Minecraft from 1.8.8 and targets Java 8. The Hytale variant is built against server 0.7.4. Fabric, Forge and NeoForge target Minecraft Java 26.1.2 and require Java 25. Install Fabric API for Fabric. Sponge targets SpongeAPI 17 on Minecraft Java 1.21.10. The Nukkit variant targets Cloudburst Nukkit API 1.1 and connects to a Minecraft Bedrock server. Use the Java version required by your server or proxy.
 
 1. In KraftInk, open **Servers → Game servers**, add a KraftLink connection and generate a connection token.
 2. Restart the server. Set `cms_url` to your KraftInk site's HTTPS address and enter the connection `token` in KraftLink's generated `config.json`. To run commands, list the allowed command names in `allowed_command_roots`.
@@ -22,10 +27,11 @@ The Bukkit variant supports Minecraft from 1.8.8 and targets Java 8. The Hytale 
 
 ## Build from source
 
-Build with JDK 25 and Maven.
+Build with JDK 25, Maven and the Gradle wrapper.
 
 ```shell
 mvn clean package
+bash mods/gradlew -p mods assemble
 ```
 
-The build writes `KraftLink.jar` and the three dedicated variants to `target/`.
+On Windows, use `mods\gradlew.bat -p mods assemble` for the second command. The builds write `KraftLink.jar` and the dedicated variants to `target/`.

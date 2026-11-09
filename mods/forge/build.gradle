@@ -1,0 +1,20 @@
+plugins {
+    id 'net.minecraftforge.gradle' version '7.0.40'
+}
+
+base.archivesName = 'KraftLink-Forge'
+
+minecraft {
+    mappings channel: 'official', version: rootProject.minecraftVersion
+}
+
+repositories {
+    minecraft.mavenizer(it)
+    maven fg.forgeMaven
+    maven fg.minecraftLibsMaven
+    mavenCentral()
+}
+
+dependencies {
+    implementation minecraft.dependency("net.minecraftforge:forge:${rootProject.minecraftVersion}-64.1.5")
+}

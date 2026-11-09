@@ -1,0 +1,24 @@
+modLoader = "javafml"
+loaderVersion = "[64,)"
+license = "MIT"
+
+[[mods]]
+modId = "kraftlink"
+version = "${kraftLinkVersion}"
+displayName = "KraftLink"
+description = "KraftInk server connection"
+displayTest = "IGNORE_ALL_VERSION"
+
+[[dependencies.kraftlink]]
+modId = "forge"
+mandatory = true
+versionRange = "[64.1.5,65)"
+ordering = "NONE"
+side = "SERVER"
+
+[[dependencies.kraftlink]]
+modId = "minecraft"
+mandatory = true
+versionRange = "[26.1.2]"
+ordering = "NONE"
+side = "SERVER"

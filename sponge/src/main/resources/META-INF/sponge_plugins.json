@@ -1,0 +1,16 @@
+{
+    "loader": { "name": "java_plain", "version": "1.0" },
+    "license": "MIT",
+    "plugins": [
+        {
+            "id": "kraftlink",
+            "name": "KraftLink",
+            "version": "${project.version}",
+            "entrypoint": "fr.nivcoo.kraftlink.sponge.KraftLink",
+            "description": "KraftInk server connection",
+            "dependencies": [
+                { "id": "spongeapi", "version": "[17,18)" }
+            ]
+        }
+    ]
+}

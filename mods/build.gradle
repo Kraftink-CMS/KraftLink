@@ -1,0 +1,56 @@
+def mavenVersion = (file('../pom.xml').text =~ /<version>([^<]+)<\/version>/)
+if (!mavenVersion.find()) {
+    throw new GradleException('KraftLink version is missing from pom.xml')
+}
+def kraftLinkVersion = mavenVersion.group(1)
+def artifacts = layout.projectDirectory.dir('../target')
+def runtimeJar = file("../common/target/KraftLink-mod-runtime-${kraftLinkVersion}.jar")
+def sharedSources = file('src/main/java')
+def kraftLinkLicense = file('../LICENSE')
+
+ext.minecraftVersion = '26.1.2'
+
+subprojects {
+    apply plugin: 'java'
+
+    group = 'fr.nivcoo.kraftlink'
+    version = kraftLinkVersion
+
+    java {
+        toolchain.languageVersion = JavaLanguageVersion.of(25)
+    }
+
+    sourceSets.main.java.srcDir(sharedSources)
+
+    dependencies {
+        compileOnly files(runtimeJar)
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+        options.release = 25
+        doFirst {
+            if (!runtimeJar.isFile()) {
+                throw new GradleException('Run mvn package in the KraftLink directory before building the mods.')
+            }
+        }
+    }
+
+    tasks.named('processResources', ProcessResources) {
+        inputs.property('kraftLinkVersion', kraftLinkVersion)
+        filesMatching(['fabric.mod.json', 'META-INF/mods.toml', 'META-INF/neoforge.mods.toml']) {
+            expand(kraftLinkVersion: kraftLinkVersion)
+        }
+    }
+
+    tasks.named('jar', Jar) {
+        destinationDirectory = artifacts
+        preserveFileTimestamps = false
+        reproducibleFileOrder = true
+        from(zipTree(runtimeJar)) {
+            exclude 'META-INF/MANIFEST.MF'
+        }
+        from(kraftLinkLicense)
+        manifest.attributes('Multi-Release': 'true')
+    }
+}

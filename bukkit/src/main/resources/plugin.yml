@@ -2,7 +2,7 @@ name: KraftLink
 version: '${project.version}'
 main: fr.nivcoo.kraftlink.bukkit.KraftLink
 folia-supported: true
-softdepend: [floodgate]
+softdepend: [floodgate, SkinsRestorer]
 loadbefore: [AuthMe]
 
 description: KraftInk server connection

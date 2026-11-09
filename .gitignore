@@ -13,6 +13,9 @@
 target/
 out/
 *.jar
+!mods/gradle/wrapper/gradle-wrapper.jar
+mods/.gradle/
+mods/**/build/
 dependency-reduced-pom.xml
 /.work/
 *.log

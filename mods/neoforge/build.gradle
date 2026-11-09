@@ -1,0 +1,9 @@
+plugins {
+    id 'net.neoforged.moddev' version '2.0.148'
+}
+
+base.archivesName = 'KraftLink-NeoForge'
+
+neoForge {
+    version = '26.1.2.126'
+}

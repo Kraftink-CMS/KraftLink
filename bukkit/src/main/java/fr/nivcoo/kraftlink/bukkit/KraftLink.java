@@ -6,6 +6,7 @@ import fr.nivcoo.kraftlink.api.KraftLinkProvider;
 import fr.nivcoo.kraftlink.bukkit.command.KraftLinkCommand;
 import fr.nivcoo.kraftlink.bukkit.command.PaperLinkCommand;
 import fr.nivcoo.kraftlink.bukkit.hook.AuthMeRegistrationHook;
+import fr.nivcoo.kraftlink.bukkit.hook.SkinsRestorerHook;
 import fr.nivcoo.kraftlink.bukkit.platform.BukkitPlatform;
 import fr.nivcoo.kraftlink.bukkit.platform.PaperPlatform;
 import fr.nivcoo.kraftlink.config.LinkInstance;
@@ -33,6 +34,7 @@ public final class KraftLink extends JavaPlugin implements KraftLinkProvider {
     private DeliveryEngine engine;
     private BukkitPlatform platform;
     private AuthMeRegistrationHook authMeRegistration;
+    private SkinsRestorerHook skinsRestorer;
 
     @Override
     public void onEnable() {
@@ -50,6 +52,7 @@ public final class KraftLink extends JavaPlugin implements KraftLinkProvider {
             registerLinkShortcut(executor);
             platform.registerSignInMenu();
             installAuthMeRegistration();
+            installSkinsRestorer();
             engine.start();
             if (!config.enabled()) getLogger().info("KraftLink is waiting for cms_url and token in config.json.");
             if (config.allowedCommandRoots.isEmpty()) {
@@ -75,6 +78,9 @@ public final class KraftLink extends JavaPlugin implements KraftLinkProvider {
         }
         if (authMeRegistration != null) {
             authMeRegistration.close();
+        }
+        if (skinsRestorer != null) {
+            skinsRestorer.close();
         }
         if (platform != null) {
             platform.closeSignInMenu();
@@ -110,6 +116,18 @@ public final class KraftLink extends JavaPlugin implements KraftLinkProvider {
 
     public Path configPath() {
         return getDataFolder().toPath().resolve("config.json");
+    }
+
+    private void installSkinsRestorer() {
+        Plugin dependency = getServer().getPluginManager().getPlugin("SkinsRestorer");
+        if (dependency == null || !dependency.isEnabled()) {
+            return;
+        }
+        try {
+            skinsRestorer = SkinsRestorerHook.install(dependency, platform, engine);
+        } catch (IllegalStateException | LinkageError error) {
+            getLogger().log(Level.WARNING, "KraftLink could not load the SkinsRestorer integration", error);
+        }
     }
 
     @Override
